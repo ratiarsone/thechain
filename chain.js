@@ -522,7 +522,7 @@
     refreshNodes();
     if (state.opened) {
       var ms = getMemState(id);
-      startScoreForMemory(id, ms.seen);
+      startScoreForMemory(id, ms.seen || scoreGestureUnlocked);
       syncMusicToClarity(ms.seen ? 1 : ms.clarity, ms.seen);
     }
     developPointer = false;
@@ -733,6 +733,14 @@
   var pendingCue = null;
   var pendingAutoplay = false;
   var cueIdx = 0;
+  var scoreGestureUnlocked = false;
+  var pendingCueIdx = null;
+
+  function unlockScoreGesture() {
+    scoreGestureUnlocked = true;
+  }
+  document.addEventListener("pointerdown", unlockScoreGesture, true);
+  document.addEventListener("keydown", unlockScoreGesture, true);
 
   function scoreEmbedSrc(track) {
     return "https://w.soundcloud.com/player/?visual=false&url=" + encodeURIComponent(track.api) +
@@ -764,20 +772,36 @@
     loadScoreCue(scoreCueFor(id), false);
   }
 
+  function tryPlayScore() {
+    if (!scWidget || !scReady) {
+      scoreAutoplayPending = true;
+      return;
+    }
+    scWidget.setVolume(100);
+    scWidget.play();
+  }
+
   function loadScoreCue(i, autoplay) {
-    cueIdx = i;
-    updateScoreLabel();
     var t = SCORE_CUE[i];
     if (!t) return;
+    var shouldPlay = !!autoplay && scoreGestureUnlocked;
+    if (scWidget && scReady && cueIdx === i) {
+      cueIdx = i;
+      updateScoreLabel();
+      if (shouldPlay) tryPlayScore();
+      return;
+    }
+    cueIdx = i;
+    updateScoreLabel();
     if (!scWidget) {
       pendingCue = i;
-      pendingAutoplay = !!autoplay;
+      pendingAutoplay = shouldPlay;
       if (scoreIframe) scoreIframe.src = scoreEmbedSrc(t);
       return;
     }
-    scoreAutoplayPending = !!autoplay;
-    scReady = false;
-    scWidget.load(t.page, { auto_play: !!autoplay });
+    pendingCueIdx = i;
+    scoreAutoplayPending = shouldPlay;
+    scWidget.load(t.page, { auto_play: shouldPlay });
   }
 
   function advanceScoreCue() {
@@ -815,9 +839,13 @@
         loadScoreCue(i, ap);
         return;
       }
+      if (pendingCueIdx !== null && pendingCueIdx !== cueIdx) {
+        pendingCueIdx = null;
+      }
       if (scoreAutoplayPending) {
         scoreAutoplayPending = false;
-        scWidget.play();
+        if (charSelect && !charSelect.classList.contains("gone")) tryPlayScore();
+        else scWidget.play();
       }
     });
     scWidget.bind(SC.Widget.Events.PLAY, function () {
@@ -866,8 +894,8 @@
   };
   var RELIEF_SEG_W = 200;
   var RELIEF_SEG_H = 260;
-  var RELIEF_DISPLACEMENT = 0.22;
-  var RELIEF_OPACITY = 0.52;
+  var RELIEF_DISPLACEMENT = 0.32;
+  var RELIEF_OPACITY = 0.7;
   var CHANNEL_TINT = { outer: 0x46ff97, inner: 0xff5546 };
 
   var tv = null;
@@ -965,7 +993,7 @@
 
     var scene = new T.Scene();
     var camera = new T.PerspectiveCamera(32, w / h, 0.1, 100);
-    camera.position.set(0, 0, 4.1);
+    camera.position.set(0, 0, 3.55);
 
     var key = new T.DirectionalLight(0xffffff, 1.25);
     key.position.set(1.1, 2.6, 3.8);
@@ -1240,7 +1268,7 @@
       pauseScore();
       return;
     }
-    startScoreForMemory(id, true);
+    loadScoreCue(scoreCueFor(id), true);
   }
 
   function previewChar(id) {
