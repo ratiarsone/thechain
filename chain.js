@@ -392,7 +392,15 @@
     scWidget.bind(SC.Widget.Events.PLAY, function () { score.classList.add("playing"); });
     scWidget.bind(SC.Widget.Events.PAUSE, function () { score.classList.remove("playing"); });
     scWidget.bind(SC.Widget.Events.FINISH, function () { score.classList.remove("playing"); });
+    playHaizina();
   }
+
+  function bootHaizinaFromHome() {
+    playHaizina();
+  }
+
+  document.body.addEventListener("pointerdown", bootHaizinaFromHome, { once: true });
+  document.body.addEventListener("keydown", bootHaizinaFromHome, { once: true });
 
   score.addEventListener("click", toggleHaizinaPlayback);
 
@@ -538,7 +546,6 @@
     state.opened = true;
     startClock();
     if (!reduceMotion) startIdle();
-    playHaizina();
     select(id, true);
     save();
   }
@@ -603,6 +610,7 @@
     buildRoster();
     highlightChar(csPick);
     charSelect.classList.remove("gone");
+    bootHaizinaFromHome();
   }
   init();
 })();
