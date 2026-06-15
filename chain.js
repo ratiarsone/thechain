@@ -281,13 +281,18 @@
   // ============================================================
   // RENDER active fragment into CG card + readout
   // ============================================================
+  function bgSrc(path) {
+    return encodeURI(path);
+  }
+
   function preloadMemoryBackgrounds() {
     FRAGS.forEach(function (f) {
       if (!f.backgroundImage) return;
+      var src = f.backgroundImage;
       var img = new Image();
-      img.onload = function () { memBgReady[f.backgroundImage] = true; };
-      img.onerror = function () { memBgReady[f.backgroundImage] = false; };
-      img.src = f.backgroundImage;
+      img.onload = function () { memBgReady[src] = true; };
+      img.onerror = function () { memBgReady[src] = false; };
+      img.src = bgSrc(src);
     });
   }
 
@@ -316,18 +321,18 @@
         memBgReady[src] = false;
         hideMemoryBackground();
       };
-      probe.src = src;
+      probe.src = bgSrc(src);
       return;
     }
     var active = memBgSlot === 0 ? memBgA : memBgB;
     var next = memBgSlot === 0 ? memBgB : memBgA;
     var cur = active.style.backgroundImage;
-    var enc = encodeURI(src);
+    var enc = bgSrc(src);
     if (cur && (cur.indexOf(src) !== -1 || cur.indexOf(enc) !== -1)) {
       memBg.classList.add("visible");
       return;
     }
-    next.style.backgroundImage = "url(\"" + encodeURI(src) + "\")";
+    next.style.backgroundImage = "url(\"" + bgSrc(src) + "\")";
     active.classList.remove("is-active");
     next.classList.add("is-active");
     memBgSlot = 1 - memBgSlot;
@@ -697,6 +702,12 @@
   if (brandHome) brandHome.addEventListener("click", goHome);
   if (memCrumbHome) memCrumbHome.addEventListener("click", goHome);
   if (memCrumbBack) memCrumbBack.addEventListener("click", goHome);
+  if (featured) {
+    featured.addEventListener("click", function () {
+      if (charSelect.classList.contains("gone")) return;
+      if (!charLocked(csPick)) enterWith(csPick);
+    });
+  }
   document.addEventListener("keydown", function (e) {
     if (charSelect.classList.contains("gone")) return;
     var i = RECEIVED.indexOf(csPick);
@@ -738,16 +749,25 @@
     if (state.witnessed.indexOf("installed") !== -1) { crt.classList.add("installed"); coreSeed.innerHTML = "IT HOLDS<br>ON ITS OWN"; }
 
     // park ring on active without glitch
+    csPick = (state.active && !charLocked(state.active)) ? state.active : RECEIVED[0];
+    buildRoster();
+    highlightChar(csPick);
+
+    if (state.opened && state.active && !charLocked(state.active)) {
+      charSelect.classList.add("gone");
+      startClock();
+      if (!reduceMotion) startIdle();
+    } else {
+      state.opened = false;
+      hideMemoryBackground();
+      charSelect.classList.remove("gone");
+    }
+
     spin = -angleOf(state.active);
     ring.style.transition = "none";
     ring.style.transform = "rotateY(" + spin + "deg)";
     render(byId[state.active]);
     refreshNodes();
-
-    csPick = (state.active && !charLocked(state.active)) ? state.active : RECEIVED[0];
-    buildRoster();
-    highlightChar(csPick);
-    charSelect.classList.remove("gone");
   }
   init();
 })();
