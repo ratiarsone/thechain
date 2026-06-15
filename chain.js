@@ -278,7 +278,7 @@
 
   function syncMusicToClarity(c, seen) {
     if (!scWidget || !scReady) return;
-    var vol = Math.round((seen ? 1 : c) * 100);
+    var vol = Math.round((seen ? 1 : Math.max(0.22, c)) * 100);
     scWidget.setVolume(Math.max(0, Math.min(100, vol)));
   }
 
@@ -742,10 +742,11 @@
   document.addEventListener("pointerdown", unlockScoreGesture, true);
   document.addEventListener("keydown", unlockScoreGesture, true);
 
-  function scoreEmbedSrc(track) {
+  function scoreEmbedSrc(track, autoplay) {
     return "https://w.soundcloud.com/player/?visual=false&url=" + encodeURIComponent(track.api) +
       "&secret_token=" + encodeURIComponent(track.secret) +
-      "&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false&show_artwork=false&color=%2346ff97";
+      "&auto_play=" + (autoplay ? "true" : "false") +
+      "&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false&show_artwork=false&color=%2346ff97";
   }
 
   function updateScoreLabel() {
@@ -781,14 +782,32 @@
     scWidget.play();
   }
 
+  function waitAndPlayScore() {
+    tryPlayScore();
+    if (scWidget && scReady) return;
+    var tries = 0;
+    var poll = setInterval(function () {
+      tries++;
+      if (scWidget && scReady) {
+        clearInterval(poll);
+        tryPlayScore();
+      } else if (tries > 50) clearInterval(poll);
+    }, 80);
+  }
+
+  function playScoreCueNow(i) {
+    loadScoreCue(i, true);
+    waitAndPlayScore();
+  }
+
   function loadScoreCue(i, autoplay) {
     var t = SCORE_CUE[i];
     if (!t) return;
-    var shouldPlay = !!autoplay && scoreGestureUnlocked;
+    var shouldPlay = !!autoplay;
     if (scWidget && scReady && cueIdx === i) {
       cueIdx = i;
       updateScoreLabel();
-      if (shouldPlay) tryPlayScore();
+      if (shouldPlay) waitAndPlayScore();
       return;
     }
     cueIdx = i;
@@ -796,7 +815,7 @@
     if (!scWidget) {
       pendingCue = i;
       pendingAutoplay = shouldPlay;
-      if (scoreIframe) scoreIframe.src = scoreEmbedSrc(t);
+      if (scoreIframe) scoreIframe.src = scoreEmbedSrc(t, shouldPlay);
       return;
     }
     pendingCueIdx = i;
@@ -1263,12 +1282,14 @@
     fTags.innerHTML = (locked ? '<span class="ftag">LOCKED</span>' : '<span class="ftag">MEMORY ' + c.p + ' OF ' + TOTAL + '</span>');
   }
 
-  function playRosterScore(id) {
+  function playRosterScore(id, fromGesture) {
     if (charLocked(id)) {
       pauseScore();
       return;
     }
-    loadScoreCue(scoreCueFor(id), true);
+    if (fromGesture) unlockScoreGesture();
+    if (scoreGestureUnlocked || fromGesture) playScoreCueNow(scoreCueFor(id));
+    else loadScoreCue(scoreCueFor(id), false);
   }
 
   function previewChar(id) {
@@ -1288,6 +1309,14 @@
   function onRosterPointerOver(e) {
     var id = rosterPreviewTarget(e);
     if (id) previewChar(id);
+  }
+
+  function onRosterPointerDown(e) {
+    var id = rosterPreviewTarget(e);
+    if (!id) return;
+    unlockScoreGesture();
+    if (csHover !== id) previewChar(id);
+    playRosterScore(id, true);
   }
 
   function onRosterPointerLeave(e) {
@@ -1330,11 +1359,14 @@
     csPick = id;
     csHover = null;
     paintFeatured(id);
-    previewScoreForMemory(id);
+    if (scoreGestureUnlocked) playScoreCueNow(scoreCueFor(id));
+    else previewScoreForMemory(id);
   }
 
   function enterWith(id) {
     if (charLocked(id)) return;
+    unlockScoreGesture();
+    playScoreCueNow(scoreCueFor(id));
     charSelect.classList.add("gone");
     if (tv) tv.stop();
     state.opened = true;
@@ -1370,7 +1402,10 @@
   function featuredPick() { return csHover || csPick; }
 
   window.addEventListener("resize", function () { if (tv) tv.resize(); });
-  if (roster) roster.addEventListener("pointerover", onRosterPointerOver);
+  if (roster) {
+    roster.addEventListener("pointerover", onRosterPointerOver);
+    roster.addEventListener("pointerdown", onRosterPointerDown);
+  }
   if (rosterWrap) rosterWrap.addEventListener("pointerleave", onRosterPointerLeave);
 
   rosterBtn.addEventListener("click", goHome);

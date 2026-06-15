@@ -330,10 +330,9 @@ body.memory-open .stage.mem-seen .develop-zone { pointer-events: none; cursor: d
   position: relative; z-index: 10; min-height: 0;
   perspective: 1200px; perspective-origin: 50% 50%;
   display: grid; place-items: center;
-  opacity: calc(0.78 + var(--clarity) * 0.22);
-  filter: blur(calc((1 - var(--clarity)) * 3px));
-  transform: scale(calc(0.97 + var(--clarity) * 0.03));
-  transition: opacity 0.35s var(--ease), filter 0.35s var(--ease), transform 0.35s var(--ease);
+  opacity: 1;
+  filter: none;
+  transform: none;
 }
 .ring-wrap { position: relative; width: 1px; height: 1px; transform-style: preserve-3d; transform: translateY(-1vh) rotateX(-19deg); }
 .ring {
@@ -400,7 +399,7 @@ body.memory-open .stage.mem-seen .develop-zone { pointer-events: none; cursor: d
   border: 1.5px solid rgba(70,255,151,calc(0.22 + var(--clarity) * 0.45)); color: var(--grn-soft);
   box-shadow: 0 0 0 1px rgba(0,0,0,0.5);
   transition: all 0.3s var(--ease);
-  opacity: calc(0.45 + var(--clarity) * 0.55);
+  opacity: calc(0.92 + var(--clarity) * 0.08);
 }
 .node.seen .badge { opacity: 1; }
 .node .badge .n { font-family: var(--disp); font-weight: 700; font-size: 1.15rem; line-height: 1; text-shadow: 0 0 6px rgba(70,255,151,0.4); }
