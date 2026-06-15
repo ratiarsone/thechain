@@ -1059,12 +1059,13 @@
       render();
     }
 
+    var loadGen = 0;
+
     function loadImage(url) {
       return new Promise(function (resolve, reject) {
         var img = new Image();
-        img.crossOrigin = "anonymous";
         img.onload = function () { resolve(img); };
-        img.onerror = reject;
+        img.onerror = function () { reject(new Error("img fail " + url)); };
         img.src = url;
       });
     }
@@ -1077,10 +1078,14 @@
         setIconModel(locked ? "orb" : c.model, tintHex, locked);
         return;
       }
+      var gen = ++loadGen;
+      clearGroup();
+      render();
       Promise.all([
         loadImage(photos.color),
         loadImage(photos.depth).catch(function () { return null; })
       ]).then(function (res) {
+        if (gen !== loadGen) return;
         var colorImg = res[0];
         var depthImg = res[1];
         var colorTex = new T.Texture(colorImg);
@@ -1096,6 +1101,7 @@
         }
         buildRelief(colorTex, depthTex, tintHex);
       }).catch(function () {
+        if (gen !== loadGen) return;
         setIconModel(c.model || "son", tintHex, false);
       });
     }
