@@ -17,7 +17,8 @@
     { label: "THE STAIRS", page: "https://soundcloud.com/parkdl/the-stairs-ruff-mix/s-6ZWiZALOuLX", api: "https://api.soundcloud.com/tracks/2282565227", secret: "s-6ZWiZALOuLX" },
     { label: "THE WEIGHT", page: "https://soundcloud.com/parkdl/the-weight-2-w-guits/s-4LV9f9lZ7rW", api: "https://api.soundcloud.com/tracks/2272915949", secret: "s-4LV9f9lZ7rW" },
     { label: "FADY", page: "https://soundcloud.com/parkdl/fady-oohs-3/s-MDVt4YfqhS3", api: "https://api.soundcloud.com/tracks/2260182809", secret: "s-MDVt4YfqhS3" },
-    { label: "IRERY AHO", page: "https://soundcloud.com/parkdl/irery-aho-live-drums-guit/s-mIXJYuegPeZ", api: "https://api.soundcloud.com/tracks/2247689000", secret: "s-mIXJYuegPeZ" }
+    { label: "IRERY AHO", page: "https://soundcloud.com/parkdl/irery-aho-live-drums-guit/s-mIXJYuegPeZ", api: "https://api.soundcloud.com/tracks/2247689000", secret: "s-mIXJYuegPeZ" },
+    { label: "THE EYES", page: "https://soundcloud.com/parkdl/song-4-the-eyes-ballad-starts-amazing-and-stays-that-way-5/s-aPkxeqOwa7F", api: "https://api.soundcloud.com/tracks/2220807767", secret: "s-aPkxeqOwa7F" }
   ];
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
