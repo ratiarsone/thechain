@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>The Chain · Movement I — Yesterday</title>
 <meta name="description" content="Movement I — Yesterday. The chain installed. A green-phosphor orbit of inherited memory, read inside TransmissionOS." />
-<link rel="stylesheet" href="chain.css?v=17" />
+<link rel="stylesheet" href="chain.css?v=20" />
 </head>
 <body data-channel="outer">
 
@@ -93,7 +93,16 @@
     <div class="mem-bg" id="memBg" aria-hidden="true">
       <img class="mem-bg-layer is-active" id="memBgA" alt="" decoding="async" />
       <img class="mem-bg-layer" id="memBgB" alt="" decoding="async" />
+      <div class="mem-bg-grain" id="memBgGrain" aria-hidden="true"></div>
       <div class="mem-bg-scrim"></div>
+    </div>
+    <div class="develop-zone" id="developZone" hidden aria-hidden="true">
+      <p class="develop-hint" id="developHint">HOLD TO SEE · SPACE OR PRESS</p>
+      <p class="develop-persp" id="developPersp" hidden>SWITCH PERSPECTIVE TO RECOGNIZE</p>
+    </div>
+    <div class="recognition-flash" id="recognitionFlash" hidden aria-live="polite">
+      <span class="rec-tag">RECOGNITION</span>
+      <p class="rec-line" id="recognitionLine"></p>
     </div>
     <div class="orbit" id="orbit">
       <div class="ring-wrap">
@@ -165,6 +174,8 @@
 
     <div class="tp">
       <div class="wmeter">
+        <span class="lab">SEEN</span>
+        <span class="lab seen-n" id="seenCount">0/6</span>
         <span class="lab">CHAIN</span>
         <span class="segs" id="wsegs"><i></i><i></i><i></i><i></i><i></i><i></i></span>
         <span class="lab" id="wcount">0/6</span>
@@ -180,6 +191,6 @@
 
 <script src="https://w.soundcloud.com/player/api.js"></script>
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script src="chain.js?v=23"></script>
+<script src="chain.js?v=25"></script>
 </body>
 </html>

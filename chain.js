@@ -140,6 +140,12 @@
   var memBg = document.getElementById("memBg");
   var memBgA = document.getElementById("memBgA");
   var memBgB = document.getElementById("memBgB");
+  var developZone = document.getElementById("developZone");
+  var developHint = document.getElementById("developHint");
+  var developPersp = document.getElementById("developPersp");
+  var recognitionFlash = document.getElementById("recognitionFlash");
+  var recognitionLineEl = document.getElementById("recognitionLine");
+  var seenCountEl = document.getElementById("seenCount");
 
   var RING_R = 178;
   var nodeEls = {};
@@ -190,10 +196,264 @@
     FRAGS.forEach(function (f) {
       var n = nodeEls[f.id]; if (!n) return;
       n.classList.toggle("witnessed", state.witnessed.indexOf(f.id) !== -1);
+      n.classList.toggle("seen", getMemState(f.id).seen);
       n.classList.toggle("active", f.id === state.active);
       n.classList.toggle("locked", !!f.terminus && isTerminusLocked());
     });
   }
+
+  // ============================================================
+  // SEE / DEVELOP — press and hold to bring memory into focus
+  // ============================================================
+  var DEVELOP_RISE = 1 / 3.6;
+  var DEVELOP_DECAY = 0.11;
+  var LOCK_THRESH = 0.95;
+  var developing = false;
+  var developPointer = false;
+  var developSpace = false;
+  var developRAF = null;
+  var lastDevelopTs = 0;
+
+  function defaultMemState() {
+    return { clarity: 0, seen: false, viewedWorld: false, viewedInside: false };
+  }
+
+  function initMemoryStates() {
+    if (!state.memoryState || typeof state.memoryState !== "object") state.memoryState = {};
+    FRAGS.forEach(function (f) {
+      var m = state.memoryState[f.id];
+      if (!m || typeof m !== "object") {
+        state.memoryState[f.id] = defaultMemState();
+        return;
+      }
+      m.clarity = typeof m.clarity === "number" ? Math.max(0, Math.min(1, m.clarity)) : 0;
+      m.seen = !!m.seen;
+      m.viewedWorld = !!m.viewedWorld;
+      m.viewedInside = !!m.viewedInside;
+      if (m.seen) m.clarity = 1;
+    });
+  }
+
+  function getMemState(id) {
+    if (!state.memoryState[id]) state.memoryState[id] = defaultMemState();
+    return state.memoryState[id];
+  }
+
+  function recognitionLineFor(f) {
+    return f.outer || "";
+  }
+
+  function countSeen() {
+    var n = 0;
+    FRAGS.forEach(function (f) { if (getMemState(f.id).seen) n++; });
+    return n;
+  }
+
+  function updateSeenMeter() {
+    if (seenCountEl) seenCountEl.textContent = countSeen() + "/" + TOTAL;
+  }
+
+  function inMemoryView() {
+    return state.opened && charSelect.classList.contains("gone");
+  }
+
+  function perspectiveGate(id) {
+    var m = getMemState(id);
+    return m.viewedWorld && m.viewedInside;
+  }
+
+  function trackPerspective(id) {
+    var m = getMemState(id);
+    if (state.channel === "outer") m.viewedWorld = true;
+    else m.viewedInside = true;
+    tryCompleteRecognition(id);
+  }
+
+  function tryCompleteRecognition(id) {
+    var m = getMemState(id);
+    if (m.seen || m.clarity < LOCK_THRESH) return;
+    if (perspectiveGate(id)) lockSeen(id);
+  }
+
+  function syncMusicToClarity(c, seen) {
+    if (!scWidget || !scReady) return;
+    var vol = Math.round((seen ? 1 : c) * 100);
+    scWidget.setVolume(Math.max(0, Math.min(100, vol)));
+  }
+
+  function maybePlayForDevelop(c) {
+    if (!scWidget || !scReady || score.classList.contains("playing")) return;
+    if (c > 0.15) {
+      scoreAutoplayPending = true;
+      scWidget.play();
+    }
+  }
+
+  function updateDevelopPrompt(id) {
+    if (!developPersp) return;
+    var m = getMemState(id);
+    if (m.seen) { developPersp.hidden = true; return; }
+    var need = !m.viewedWorld || !m.viewedInside;
+    developPersp.hidden = !(need && m.clarity >= 0.5);
+    if (!developPersp.hidden) {
+      if (!m.viewedWorld && !m.viewedInside) developPersp.textContent = "SEE THE WORLD · THEN INSIDE HIM";
+      else if (!m.viewedWorld) developPersp.textContent = "LOOK FROM THE WORLD";
+      else developPersp.textContent = "LOOK FROM INSIDE HIM";
+    }
+  }
+
+  function updateDevelopZone(id) {
+    if (!developZone) return;
+    var show = inMemoryView() && !getMemState(id).seen;
+    developZone.hidden = !show;
+    developZone.setAttribute("aria-hidden", show ? "false" : "true");
+  }
+
+  function applyClarityVisuals(id) {
+    var m = getMemState(id);
+    var c = m.seen ? 1 : m.clarity;
+    stage.style.setProperty("--clarity", String(c));
+    stage.style.setProperty("--seen", m.seen ? "1" : "0");
+    stage.classList.toggle("mem-seen", m.seen);
+    stage.classList.toggle("clarity-waiting", !m.seen && m.clarity >= LOCK_THRESH - 0.02 && !perspectiveGate(id));
+    updateDevelopPrompt(id);
+    updateDevelopZone(id);
+    syncMusicToClarity(c, m.seen);
+  }
+
+  function fireRecognition(id) {
+    var f = byId[id];
+    if (!f || !recognitionFlash || !recognitionLineEl) return;
+    recognitionLineEl.textContent = recognitionLineFor(f);
+    recognitionFlash.hidden = false;
+    recognitionFlash.classList.remove("is-on");
+    void recognitionFlash.offsetWidth;
+    recognitionFlash.classList.add("is-on");
+    setTimeout(function () {
+      recognitionFlash.hidden = true;
+      recognitionFlash.classList.remove("is-on");
+    }, 3200);
+  }
+
+  function lockSeen(id) {
+    var m = getMemState(id);
+    if (m.seen) return;
+    m.clarity = 1;
+    m.seen = true;
+    developing = false;
+    developPointer = false;
+    developSpace = false;
+    stage.classList.remove("developing");
+    applyClarityVisuals(id);
+    refreshNodes();
+    updateSeenMeter();
+    fireRecognition(id);
+    save();
+  }
+
+  function isDevelopActive() {
+    return developing && (developPointer || developSpace);
+  }
+
+  function developTick(ts) {
+    if (!inMemoryView()) {
+      developing = false;
+      developPointer = false;
+      developSpace = false;
+      stage.classList.remove("developing");
+      developRAF = null;
+      return;
+    }
+    var id = state.active;
+    var m = getMemState(id);
+    if (m.seen) {
+      developRAF = null;
+      developing = false;
+      stage.classList.remove("developing");
+      return;
+    }
+    var dt = Math.min(0.05, (ts - lastDevelopTs) / 1000);
+    lastDevelopTs = ts;
+
+    if (isDevelopActive()) {
+      var prev = m.clarity;
+      m.clarity = Math.min(LOCK_THRESH, m.clarity + DEVELOP_RISE * dt);
+      if (m.clarity > prev) maybePlayForDevelop(m.clarity);
+      if (m.clarity >= LOCK_THRESH && perspectiveGate(id)) {
+        lockSeen(id);
+        developRAF = null;
+        return;
+      }
+    } else if (m.clarity > 0) {
+      m.clarity = Math.max(0, m.clarity - DEVELOP_DECAY * dt);
+    }
+
+    applyClarityVisuals(id);
+
+    if (isDevelopActive() || m.clarity > 0.001) {
+      developRAF = requestAnimationFrame(developTick);
+    } else {
+      developRAF = null;
+      developing = false;
+      stage.classList.remove("developing");
+      save();
+    }
+  }
+
+  function ensureDevelopLoop() {
+    if (developRAF) return;
+    lastDevelopTs = performance.now();
+    developRAF = requestAnimationFrame(developTick);
+  }
+
+  function startDevelop(e) {
+    if (!inMemoryView()) return;
+    if (getMemState(state.active).seen) return;
+    developing = true;
+    if (e && typeof e.pointerId === "number") {
+      developPointer = true;
+      if (stage.setPointerCapture) {
+        try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+      }
+    }
+    stage.classList.add("developing");
+    ensureDevelopLoop();
+  }
+
+  function endDevelopPointer(e) {
+    developPointer = false;
+    if (e && typeof e.pointerId === "number" && stage.releasePointerCapture) {
+      try { stage.releasePointerCapture(e.pointerId); } catch (err) {}
+    }
+    if (!developSpace) {
+      developing = false;
+      stage.classList.remove("developing");
+      ensureDevelopLoop();
+    }
+  }
+
+  function endDevelopSpace() {
+    developSpace = false;
+    if (!developPointer) {
+      developing = false;
+      stage.classList.remove("developing");
+      ensureDevelopLoop();
+    }
+  }
+
+  function onStagePointerDown(e) {
+    if (!inMemoryView()) return;
+    if (getMemState(state.active).seen) return;
+    if (e.target.closest(".node .badge, .readout, button, .recognition-flash")) return;
+    startDevelop(e);
+  }
+
+  stage.addEventListener("pointerdown", onStagePointerDown);
+  stage.addEventListener("pointerup", endDevelopPointer);
+  stage.addEventListener("pointercancel", endDevelopPointer);
+  stage.addEventListener("pointerleave", function (e) {
+    if (developPointer && e.relatedTarget && !stage.contains(e.relatedTarget)) endDevelopPointer(e);
+  });
 
   // ring rotation
   var spin = 0, idleRAF = null, idling = false;
@@ -259,7 +519,17 @@
     witness(id);
     render(f);
     refreshNodes();
-    if (state.opened) startScoreForMemory(id, true);
+    if (state.opened) {
+      var ms = getMemState(id);
+      startScoreForMemory(id, ms.seen);
+      syncMusicToClarity(ms.seen ? 1 : ms.clarity, ms.seen);
+    }
+    developPointer = false;
+    developSpace = false;
+    if (!getMemState(id).seen) {
+      developing = false;
+      stage.classList.remove("developing");
+    }
     save();
   }
 
@@ -379,6 +649,8 @@
     }
     updateMemoryBackground(f);
     updateMemCrumb(f);
+    trackPerspective(f.id);
+    applyClarityVisuals(f.id);
   }
 
   // ============================================================
@@ -389,6 +661,8 @@
     document.body.setAttribute("data-channel", ch);
     chOuter.classList.toggle("on", ch === "outer");
     chInner.classList.toggle("on", ch === "inner");
+    trackPerspective(state.active);
+    if (tv && !charSelect.classList.contains("gone")) tv.setChannelTint(ch);
     render(byId[state.active]);
     refreshNodes();
     save();
@@ -433,6 +707,18 @@
     if (e.key === "ArrowRight") { e.preventDefault(); jog(1); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); jog(-1); }
     else if (e.key.toLowerCase() === "c") { setChannel(state.channel === "outer" ? "inner" : "outer"); }
+    else if (e.code === "Space" && !getMemState(state.active).seen) {
+      e.preventDefault();
+      if (!developSpace) {
+        developSpace = true;
+        developing = true;
+        stage.classList.add("developing");
+        ensureDevelopLoop();
+      }
+    }
+  });
+  document.addEventListener("keyup", function (e) {
+    if (e.code === "Space") endDevelopSpace();
   });
 
   // ============================================================
@@ -533,7 +819,10 @@
         scWidget.play();
       }
     });
-    scWidget.bind(SC.Widget.Events.PLAY, function () { score.classList.add("playing"); });
+    scWidget.bind(SC.Widget.Events.PLAY, function () {
+      score.classList.add("playing");
+      syncMusicToClarity(getMemState(state.active).seen ? 1 : getMemState(state.active).clarity, getMemState(state.active).seen);
+    });
     scWidget.bind(SC.Widget.Events.PAUSE, function () { score.classList.remove("playing"); });
     scWidget.bind(SC.Widget.Events.FINISH, advanceScoreCue);
     updateScoreLabel();
@@ -562,45 +851,176 @@
   // ============================================================
   var csPick = RECEIVED[0];
 
-  // ---- higher-fidelity 3D model viewer (Three.js, with CSS fallback) ----
+  // ---- character relief (P1–P4 photos + depth-displaced hologram) ----
+  var CHAR_PHOTOS = {
+    fall:     { color: "/img/mvt1/characters/noble.png",       depth: "/img/mvt1/characters/noble-depth.jpg" },
+    blessing: { color: "/img/mvt1/characters/grandmother.jpg", depth: "/img/mvt1/characters/grandmother-depth.jpg" },
+    backseat: { color: "/img/mvt1/characters/son.jpg",         depth: "/img/mvt1/characters/son-depth.jpg" },
+    glass:    { color: "/img/mvt1/characters/doctor.jpg",       depth: "/img/mvt1/characters/doctor-depth.jpg" }
+  };
+  var RELIEF_SEG_W = 200;
+  var RELIEF_SEG_H = 260;
+  var RELIEF_DISPLACEMENT = 0.35;
+  var CHANNEL_TINT = { outer: 0x46ff97, inner: 0xff5546 };
+
   var tv = null;
   var FCOL = { BLOOD: 0x46ff97, PLACE: 0x4ff6ff, WORLD: 0xff5546, DARK: 0xff7a4d };
-  function makeViewer(container) {
+
+  function channelTintHex() {
+    return CHANNEL_TINT[state.channel === "inner" ? "inner" : "outer"];
+  }
+
+  function rosterPortraitHtml(id, c, locked) {
+    if (locked || c.model === "cage" || c.model === "orb") return flatSVG(kindOf(c));
+    var ph = CHAR_PHOTOS[id];
+    if (ph) return '<img class="cc-photo" src="' + ph.color + '" alt="" decoding="async" />';
+    return flatSVG(kindOf(c));
+  }
+
+  function holoOverlayMaterial(T, tintHex) {
+    return new T.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: T.AdditiveBlending,
+      side: T.DoubleSide,
+      uniforms: {
+        uTime: { value: 0 },
+        uTint: { value: new T.Color(tintHex) },
+        uFlick: { value: 1 }
+      },
+      vertexShader: [
+        "varying vec2 vUv;",
+        "varying vec3 vNorm;",
+        "void main(){",
+        "  vUv = uv;",
+        "  vNorm = normalize(normalMatrix * normal);",
+        "  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
+        "}"
+      ].join("\n"),
+      fragmentShader: [
+        "uniform float uTime;",
+        "uniform vec3 uTint;",
+        "uniform float uFlick;",
+        "varying vec2 vUv;",
+        "varying vec3 vNorm;",
+        "void main(){",
+        "  float scan = step(0.5, fract(vUv.y * 260.0 + uTime * 0.45));",
+        "  float rim = pow(1.0 - abs(vNorm.z), 2.0);",
+        "  float a = scan * rim * uFlick * 0.48;",
+        "  vec3 col = uTint * a;",
+        "  col.r += sin(uTime * 3.0) * 0.025;",
+        "  col.b += cos(uTime * 2.6) * 0.025;",
+        "  gl_FragColor = vec4(col, a);",
+        "}"
+      ].join("\n")
+    });
+  }
+
+  function luminanceDepthFromImage(img, T) {
+    var c = document.createElement("canvas");
+    c.width = img.naturalWidth || img.width;
+    c.height = img.naturalHeight || img.height;
+    var ctx = c.getContext("2d");
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    var data = ctx.getImageData(0, 0, c.width, c.height);
+    var d = data.data;
+    for (var i = 0; i < d.length; i += 4) {
+      var lum = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+      d[i] = d[i + 1] = d[i + 2] = lum;
+    }
+    ctx.putImageData(data, 0, 0);
+    var tex = new T.CanvasTexture(c);
+    if (T.NoColorSpace) tex.colorSpace = T.NoColorSpace;
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  function makeReliefViewer(container) {
     if (!window.THREE) return null;
     var T = window.THREE;
-    var w = container.clientWidth || 320, h = container.clientHeight || 360;
-    var renderer = new T.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+    var w = Math.max(container.clientWidth, 280);
+    var h = Math.max(container.clientHeight, 320);
+    var renderer = new T.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(w, h); renderer.setClearAlpha(0);
-    var cv = renderer.domElement; cv.style.position = "absolute"; cv.style.inset = "0"; cv.style.width = "100%"; cv.style.height = "100%"; cv.style.zIndex = "2";
+    renderer.setSize(w, h);
+    renderer.setClearAlpha(0);
+    var cv = renderer.domElement;
+    cv.className = "relief-canvas";
+    cv.style.cssText = "position:absolute;inset:0;width:100%;height:100%;z-index:2";
     container.appendChild(cv);
-    var scene = new T.Scene();
-    var camera = new T.PerspectiveCamera(36, w / h, 0.1, 100); camera.position.set(0, 0.1, 5.2); camera.lookAt(0, 0, 0);
-    var key = new T.DirectionalLight(0xffffff, 1.15); key.position.set(2.5, 3, 4); scene.add(key);
-    var rim = new T.DirectionalLight(0xbfffe0, 0.7); rim.position.set(-3, 1.5, -2.5); scene.add(rim);
-    scene.add(new T.AmbientLight(0xffffff, 0.4));
-    var group = new T.Group(); scene.add(group);
-    var raf = null, spinning = false, reduce = reduceMotion;
 
-    function clearGroup() { while (group.children.length) { var c = group.children.pop(); if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); } }
-    function addFig(geo, col, lock) {
-      var solid = new T.Mesh(geo, new T.MeshPhongMaterial({ color: col, emissive: col, emissiveIntensity: 0.28, transparent: true, opacity: lock ? 0.05 : 0.2, flatShading: true, shininess: 40, side: T.DoubleSide }));
-      var wire = new T.LineSegments(new T.WireframeGeometry(geo), new T.LineBasicMaterial({ color: col, transparent: true, opacity: lock ? 0.14 : 0.85 }));
-      group.add(solid); group.add(wire);
+    var scene = new T.Scene();
+    var camera = new T.PerspectiveCamera(32, w / h, 0.1, 100);
+    camera.position.set(0, 0, 4.1);
+
+    var key = new T.DirectionalLight(0xffffff, 1.25);
+    key.position.set(1.1, 2.6, 3.8);
+    scene.add(key);
+    var rim = new T.DirectionalLight(0xbfffe0, 0.9);
+    rim.position.set(-2.4, 0.6, -2.2);
+    scene.add(rim);
+    scene.add(new T.AmbientLight(0xffffff, 0.32));
+
+    var group = new T.Group();
+    scene.add(group);
+
+    var holoMat = null;
+    var reliefMesh = null;
+    var pointer = { x: 0, y: 0 };
+    var raf = null;
+    var running = false;
+    var reduce = reduceMotion;
+    var lastIcon = { model: "noble", col: 0x46ff97, lock: false };
+
+    function disposeObj(o) {
+      if (!o) return;
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) {
+        if (Array.isArray(o.material)) o.material.forEach(function (m) { m.dispose(); });
+        else o.material.dispose();
+      }
     }
-    function bust(prof) { return new T.LatheGeometry(prof.map(function (p) { return new T.Vector2(p[0], p[1]); }), 56); }
+
+    function clearGroup() {
+      while (group.children.length) {
+        var c = group.children.pop();
+        disposeObj(c);
+      }
+      holoMat = null;
+      reliefMesh = null;
+    }
+
+    function bust(prof) {
+      return new T.LatheGeometry(prof.map(function (p) { return new T.Vector2(p[0], p[1]); }), 56);
+    }
     var PROF = {
-      noble:[[0.02,-1.3],[0.8,-1.26],[0.84,-1.05],[0.62,-0.85],[0.34,-0.62],[0.24,-0.35],[0.24,-0.1],[0.4,0.12],[0.56,0.42],[0.58,0.7],[0.46,0.95],[0.24,1.12],[0.02,1.2]],
-      grandmother:[[0.02,-1.2],[1.06,-1.16],[1.08,-0.94],[0.84,-0.7],[0.5,-0.5],[0.32,-0.32],[0.32,-0.12],[0.5,0.06],[0.66,0.32],[0.66,0.56],[0.52,0.78],[0.3,0.92],[0.02,0.98]],
-      son:[[0.02,-1.28],[1.22,-1.24],[1.24,-1.0],[0.92,-0.74],[0.5,-0.56],[0.32,-0.4],[0.32,-0.18],[0.5,0.0],[0.66,0.3],[0.68,0.56],[0.54,0.8],[0.3,0.98],[0.02,1.05]],
-      doctor:[[0.02,-1.24],[0.82,-1.2],[0.85,-1.0],[0.6,-0.78],[0.34,-0.6],[0.22,-0.4],[0.22,-0.16],[0.38,0.04],[0.52,0.32],[0.54,0.58],[0.44,0.82],[0.24,1.0],[0.02,1.07]]
+      noble: [[0.02,-1.3],[0.8,-1.26],[0.84,-1.05],[0.62,-0.85],[0.34,-0.62],[0.24,-0.35],[0.24,-0.1],[0.4,0.12],[0.56,0.42],[0.58,0.7],[0.46,0.95],[0.24,1.12],[0.02,1.2]],
+      grandmother: [[0.02,-1.2],[1.06,-1.16],[1.08,-0.94],[0.84,-0.7],[0.5,-0.5],[0.32,-0.32],[0.32,-0.12],[0.5,0.06],[0.66,0.32],[0.66,0.56],[0.52,0.78],[0.3,0.92],[0.02,0.98]],
+      son: [[0.02,-1.28],[1.22,-1.24],[1.24,-1.0],[0.92,-0.74],[0.5,-0.56],[0.32,-0.4],[0.32,-0.18],[0.5,0.0],[0.66,0.3],[0.68,0.56],[0.54,0.8],[0.3,0.98],[0.02,1.05]],
+      doctor: [[0.02,-1.24],[0.82,-1.2],[0.85,-1.0],[0.6,-0.78],[0.34,-0.6],[0.22,-0.4],[0.22,-0.16],[0.38,0.04],[0.52,0.32],[0.54,0.58],[0.44,0.82],[0.24,1.0],[0.02,1.07]]
     };
-    function setModel(model, col, lock) {
+
+    function addFig(geo, col, lock) {
+      var solid = new T.Mesh(geo, new T.MeshPhongMaterial({
+        color: col, emissive: col, emissiveIntensity: lock ? 0.12 : 0.38,
+        transparent: true, opacity: lock ? 0.08 : 0.35, flatShading: true, shininess: 40, side: T.DoubleSide
+      }));
+      var wire = new T.LineSegments(new T.WireframeGeometry(geo), new T.LineBasicMaterial({
+        color: col, transparent: true, opacity: lock ? 0.2 : 0.92
+      }));
+      group.add(solid);
+      group.add(wire);
+    }
+
+    function setIconModel(model, col, lock) {
       clearGroup();
+      lastIcon = { model: model, col: col, lock: lock };
       if (model === "cage") {
         var body = new T.BoxGeometry(1.5, 1.45, 1.2); body.translate(0, -0.42, 0); addFig(body, col, lock);
         var roof = new T.ConeGeometry(1.18, 0.95, 4); roof.rotateY(Math.PI / 4); roof.translate(0, 0.72, 0); addFig(roof, col, lock);
-        [-0.32, 0, 0.32].forEach(function (x) { var bar = new T.BoxGeometry(0.07, 1.32, 0.07); bar.translate(x, -0.45, 0.62); addFig(bar, col, lock); });
+        [-0.32, 0, 0.32].forEach(function (x) {
+          var bar = new T.BoxGeometry(0.07, 1.32, 0.07); bar.translate(x, -0.45, 0.62); addFig(bar, col, lock);
+        });
       } else if (model === "orb") {
         addFig(new T.IcosahedronGeometry(1.15, 1), col, lock);
         addFig(new T.IcosahedronGeometry(1.62, 0), col, lock);
@@ -613,12 +1033,148 @@
       }
       render();
     }
+
+    function buildRelief(colorTex, depthTex, tintHex) {
+      clearGroup();
+      var img = colorTex.image;
+      var aspect = (img.width || 1) / (img.height || 1);
+      var planeH = 2.55;
+      var planeW = planeH * aspect;
+      var geo = new T.PlaneGeometry(planeW, planeH, RELIEF_SEG_W, RELIEF_SEG_H);
+      var tint = new T.Color(tintHex);
+      reliefMesh = new T.Mesh(geo, new T.MeshStandardMaterial({
+        map: colorTex,
+        displacementMap: depthTex,
+        displacementScale: planeH * RELIEF_DISPLACEMENT,
+        roughness: 0.52,
+        metalness: 0.06,
+        emissive: tint,
+        emissiveIntensity: 0.08
+      }));
+      group.add(reliefMesh);
+      holoMat = holoOverlayMaterial(T, tintHex);
+      var holo = new T.Mesh(geo.clone(), holoMat);
+      holo.position.z = 0.003;
+      group.add(holo);
+      render();
+    }
+
+    function loadImage(url) {
+      return new Promise(function (resolve, reject) {
+        var img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = function () { resolve(img); };
+        img.onerror = reject;
+        img.src = url;
+      });
+    }
+
+    function setCharacter(charId, tintHex, locked) {
+      var c = CHARS[charId];
+      var photos = CHAR_PHOTOS[charId];
+      var useIcon = locked || !photos || c.model === "cage" || c.model === "orb";
+      if (useIcon) {
+        setIconModel(locked ? "orb" : c.model, tintHex, locked);
+        return;
+      }
+      Promise.all([
+        loadImage(photos.color),
+        loadImage(photos.depth).catch(function () { return null; })
+      ]).then(function (res) {
+        var colorImg = res[0];
+        var depthImg = res[1];
+        var loader = new T.TextureLoader();
+        var colorTex = loader.load(photos.color);
+        if (T.SRGBColorSpace) colorTex.colorSpace = T.SRGBColorSpace;
+        colorTex.needsUpdate = true;
+        var depthTex;
+        if (depthImg) {
+          depthTex = loader.load(photos.depth);
+          if (T.NoColorSpace) depthTex.colorSpace = T.NoColorSpace;
+        } else {
+          depthTex = luminanceDepthFromImage(colorImg, T);
+        }
+        buildRelief(colorTex, depthTex, tintHex);
+      }).catch(function () {
+        setIconModel(c.model || "son", tintHex, false);
+      });
+    }
+
+    function setChannelTint(channel) {
+      var hex = CHANNEL_TINT[channel === "inner" ? "inner" : "outer"];
+      if (holoMat) holoMat.uniforms.uTint.value.setHex(hex);
+      if (reliefMesh && reliefMesh.material) {
+        reliefMesh.material.emissive.setHex(hex);
+        reliefMesh.material.needsUpdate = true;
+      }
+    }
+
+    container.addEventListener("pointermove", function (e) {
+      var r = container.getBoundingClientRect();
+      if (!r.width) return;
+      pointer.x = ((e.clientX - r.left) / r.width - 0.5) * 2;
+      pointer.y = ((e.clientY - r.top) / r.height - 0.5) * 2;
+    });
+
     function render() { renderer.render(scene, camera); }
-    function loop() { raf = requestAnimationFrame(loop); group.rotation.y += 0.014; render(); }
-    function start() { if (spinning) return; spinning = true; if (reduce) { render(); spinning = false; } else loop(); }
-    function stop() { spinning = false; if (raf) cancelAnimationFrame(raf); raf = null; }
-    function resize() { var ww = container.clientWidth, hh = container.clientHeight; if (!ww || !hh) return; renderer.setSize(ww, hh); camera.aspect = ww / hh; camera.updateProjectionMatrix(); render(); }
-    return { setModel: setModel, start: start, stop: stop, resize: resize };
+
+    function loop(t) {
+      raf = requestAnimationFrame(loop);
+      var sway = Math.sin(t * 0.00055) * 0.21;
+      group.rotation.y = sway + pointer.x * 0.055;
+      group.rotation.x = Math.sin(t * 0.0004) * 0.035 - pointer.y * 0.065;
+      if (holoMat) {
+        holoMat.uniforms.uTime.value = t * 0.001;
+        holoMat.uniforms.uFlick.value = 0.86 + Math.sin(t * 0.0045) * 0.14;
+      }
+      render();
+    }
+
+    function start() {
+      if (running) return;
+      running = true;
+      if (reduce) { render(); running = false; return; }
+      loop(performance.now());
+    }
+
+    function stop() {
+      running = false;
+      if (raf) cancelAnimationFrame(raf);
+      raf = null;
+    }
+
+    function resize() {
+      var ww = Math.max(container.clientWidth, 280);
+      var hh = Math.max(container.clientHeight, 280);
+      if (!ww || !hh) return;
+      renderer.setSize(ww, hh);
+      camera.aspect = ww / hh;
+      camera.updateProjectionMatrix();
+      render();
+    }
+
+    return { setCharacter: setCharacter, setIconModel: setIconModel, setChannelTint: setChannelTint, start: start, stop: stop, resize: resize };
+  }
+
+  function ensurePortraitViewer() {
+    if (!window.THREE) return null;
+    if (!tv) {
+      fPortrait.innerHTML = "";
+      tv = makeReliefViewer(fPortrait);
+    }
+    return tv;
+  }
+
+  function kickPortraitViewer(id, locked) {
+    var viewer = ensurePortraitViewer();
+    if (!viewer) return;
+    fPortrait.className = "fportrait" + (locked ? " lockedfig" : "");
+    viewer.setCharacter(id, channelTintHex(), locked);
+    viewer.setChannelTint(state.channel);
+    requestAnimationFrame(function () {
+      viewer.resize();
+      viewer.start();
+    });
   }
 
   function facClass(fac) { return fac === "PLACE" ? "fac-place" : (fac === "WORLD" || fac === "DARK") ? "fac-world" : ""; }
@@ -635,7 +1191,7 @@
       card.innerHTML =
         '<span class="cc-idx">P' + c.p + '</span>' +
         '<span class="cc-dots">' + (locked ? '' : '<i></i><i></i><i></i>') + '</span>' +
-        '<span class="cc-portrait">' + flatSVG(kindOf(c)) + '</span>' +
+        '<span class="cc-portrait">' + rosterPortraitHtml(id, c, locked) + '</span>' +
         (locked ? '<span class="cc-lock">?</span>' : '') +
         '<span class="cc-plate"><span class="cc-name">' + (locked ? "LOCKED" : c.name) + '</span></span>';
       card.addEventListener("click", function () {
@@ -655,13 +1211,8 @@
     });
     featured.className = "featured " + facClass(c.fac);
     fWatermark.textContent = c.p;
-    var col = FCOL[c.fac] || 0x46ff97;
-    if (window.THREE) {
-      if (!tv) { fPortrait.innerHTML = '<div class="turntable"></div>'; tv = makeViewer(fPortrait); }
-      fPortrait.className = "fportrait" + (locked ? " lockedfig" : "");
-      if (tv) { tv.setModel(locked ? "orb" : (c.model || kindOf(c)), col, locked); tv.start(); }
-      else { fPortrait.innerHTML = build3d(locked ? "dark" : kindOf(c)); }
-    } else {
+    if (window.THREE) kickPortraitViewer(id, locked);
+    else {
       fPortrait.className = "fportrait" + (locked ? " lockedfig" : "");
       fPortrait.innerHTML = build3d(locked ? "dark" : kindOf(c));
     }
@@ -689,11 +1240,16 @@
     buildRoster();
     highlightChar(charLocked(csPick) ? RECEIVED[0] : csPick);
     charSelect.classList.remove("gone");
-    if (tv) { tv.resize(); tv.start(); }
+    if (tv) { requestAnimationFrame(function () { tv.resize(); tv.start(); }); }
   }
 
   function goHome() {
     if (!charSelect.classList.contains("gone")) return;
+    developing = false;
+    developPointer = false;
+    developSpace = false;
+    if (developRAF) { cancelAnimationFrame(developRAF); developRAF = null; }
+    stage.classList.remove("developing");
     state.opened = false;
     hideMemoryBackground();
     updateMemCrumb(null);
@@ -727,14 +1283,20 @@
   function save() { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
   function load() {
     try {
-      var raw = localStorage.getItem(STORE); if (!raw) return;
-      var s = JSON.parse(raw); if (!s || typeof s !== "object") return;
-      if (Array.isArray(s.witnessed)) state.witnessed = s.witnessed.filter(function (id) { return byId[id]; });
-      if (s.order === "received" || s.order === "remembered") state.order = s.order;
-      if (s.channel === "inner" || s.channel === "outer") state.channel = s.channel;
-      if (s.active && byId[s.active]) state.active = s.active;
-      state.opened = !!s.opened;
+      var raw = localStorage.getItem(STORE);
+      if (raw) {
+        var s = JSON.parse(raw);
+        if (s && typeof s === "object") {
+          if (Array.isArray(s.witnessed)) state.witnessed = s.witnessed.filter(function (id) { return byId[id]; });
+          if (s.order === "received" || s.order === "remembered") state.order = s.order;
+          if (s.channel === "inner" || s.channel === "outer") state.channel = s.channel;
+          if (s.active && byId[s.active]) state.active = s.active;
+          state.opened = !!s.opened;
+          if (s.memoryState && typeof s.memoryState === "object") state.memoryState = s.memoryState;
+        }
+      }
     } catch (e) {}
+    initMemoryStates();
   }
 
   // ============================================================
@@ -751,6 +1313,7 @@
     preloadMemoryBackgrounds();
     buildNodes();
     updateMeter();
+    updateSeenMeter();
     if (state.witnessed.indexOf("installed") !== -1) { crt.classList.add("installed"); coreSeed.innerHTML = "IT HOLDS<br>ON ITS OWN"; }
 
     // park ring on active without glitch
