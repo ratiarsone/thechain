@@ -5,47 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>The Chain · Movement I — Yesterday</title>
 <meta name="description" content="Movement I — Yesterday. The chain installed. A green-phosphor orbit of inherited memory, read inside TransmissionOS." />
-<link rel="stylesheet" href="chain.css?v=12" />
+<link rel="stylesheet" href="chain.css?v=10" />
 </head>
 <body data-channel="outer">
-
-<!-- Zafimaniry sokitra — geometric symbol library -->
-<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="zafi-sprite">
-  <defs>
-    <symbol id="zafi-honey" viewBox="0 0 48 48">
-      <path fill="none" stroke="currentColor" stroke-width="1.3" d="M24 5l12.1 7v14L24 33l-12.1-7V12L24 5z"/>
-      <path fill="none" stroke="currentColor" stroke-width="1" d="M24 33l12.1 7M24 33l-12.1 7M11.9 12L0 19M36.1 12L48 19M11.9 26L0 33M36.1 26L48 33"/>
-    </symbol>
-    <symbol id="zafi-web" viewBox="0 0 48 48">
-      <circle cx="24" cy="24" r="19" fill="none" stroke="currentColor" stroke-width="1.2"/>
-      <circle cx="24" cy="24" r="13" fill="none" stroke="currentColor" stroke-width="0.9"/>
-      <circle cx="24" cy="24" r="7" fill="none" stroke="currentColor" stroke-width="0.9"/>
-      <path fill="none" stroke="currentColor" stroke-width="0.9" d="M24 5v38M5 24h38M10 10l28 28M38 10L10 38"/>
-    </symbol>
-    <symbol id="zafi-chevron" viewBox="0 0 48 48">
-      <path fill="none" stroke="currentColor" stroke-width="1.6" d="M2 14l8 10-8 10M14 14l8 10-8 10M26 14l8 10-8 10M38 14l8 10-8 10"/>
-    </symbol>
-    <symbol id="zafi-diamond" viewBox="0 0 48 48">
-      <path fill="none" stroke="currentColor" stroke-width="1.3" d="M24 3L45 24 24 45 3 24Z"/>
-      <path fill="none" stroke="currentColor" stroke-width="0.9" d="M24 3v42M3 24h42M9 9l30 30M39 9L9 39"/>
-    </symbol>
-    <symbol id="zafi-rope" viewBox="0 0 48 48">
-      <path fill="none" stroke="currentColor" stroke-width="1.4" d="M6 6c10 8 2 16 10 24s-2 16 10 12"/>
-      <path fill="none" stroke="currentColor" stroke-width="1.4" d="M18 4c10 8 2 16 10 24s-2 16 10 12"/>
-      <path fill="none" stroke="currentColor" stroke-width="1.4" d="M30 6c10 8 2 16 10 24s-2 16 6 10"/>
-    </symbol>
-    <symbol id="zafi-star" viewBox="0 0 48 48">
-      <path fill="none" stroke="currentColor" stroke-width="1.3" d="M24 4l5 16h17l-14 10 5 16-13-10-13 10 5-16L4 20h17z"/>
-      <circle cx="24" cy="24" r="7" fill="none" stroke="currentColor" stroke-width="1"/>
-    </symbol>
-    <pattern id="zafi-pat-diamond" width="24" height="24" patternUnits="userSpaceOnUse">
-      <path d="M12 0L24 12 12 24 0 12Z" fill="none" stroke="rgba(70,255,151,0.35)" stroke-width="0.8"/>
-    </pattern>
-    <pattern id="zafi-pat-chevron" width="20" height="16" patternUnits="userSpaceOnUse">
-      <path d="M0 8l6-6 6 6-6 6z" fill="none" stroke="rgba(70,255,151,0.28)" stroke-width="0.7"/>
-    </pattern>
-  </defs>
-</svg>
 
 <!-- ============================================================
      COLD OPEN — power on
@@ -54,8 +16,6 @@
      CHARACTER SELECT (game roster)
      ============================================================ -->
 <div class="charselect" id="charSelect">
-  <div class="zafi-bg zafi-bg-chevron" aria-hidden="true"></div>
-  <div class="zafi-frame" aria-hidden="true"><span class="zafi-corner tl"></span><span class="zafi-corner tr"></span><span class="zafi-corner bl"></span><span class="zafi-corner br"></span></div>
   <div class="cs-top">
     <div class="cs-head">
       <div class="cs-title">CHOOSE WHO <b>HANDS IT DOWN</b></div>
@@ -65,9 +25,8 @@
   </div>
   <div class="cs-main">
     <div class="featured" id="featured">
-        <div class="fbg">
-          <div class="f-zafi" id="fZafi" aria-hidden="true"></div>
-          <div class="fwatermark" id="fWatermark">1</div>
+      <div class="fbg">
+        <div class="fwatermark" id="fWatermark">1</div>
         <div class="fportrait" id="fPortrait"></div>
       </div>
       <div class="fmeta">
@@ -92,8 +51,6 @@
      CRT ENVELOPE
      ============================================================ -->
 <div class="crt" id="crt">
-  <div class="zafi-bg zafi-bg-diamond" aria-hidden="true"></div>
-  <div class="zafi-frame" aria-hidden="true"><span class="zafi-corner tl"></span><span class="zafi-corner tr"></span><span class="zafi-corner bl"></span><span class="zafi-corner br"></span></div>
 
   <!-- TOP CG BAR -->
   <div class="cg-top">
@@ -135,7 +92,6 @@
           <div class="path"></div>
           <div class="core spin" id="core">
             <div class="orb"></div>
-            <div class="zafi-core" id="coreZafi" aria-hidden="true"></div>
             <div class="lat"></div><div class="lat b"></div>
             <div class="lon"></div><div class="lon b"></div>
             <div class="pulse"></div>
@@ -148,8 +104,6 @@
 
     <!-- right HUD readout (overlay) -->
     <div class="readout" id="readout">
-      <div class="zafi-sokitra" id="roSokitra"></div>
-      <div class="zafi-readout" id="roZafi" aria-hidden="true"></div>
       <div class="ro-head"><span id="roChannel">THE WORLD</span><span class="frag" id="roFrag">1 / 7</span></div>
       <div class="ro-body">
         <div class="ro-row"><span class="k">WHEN</span><span class="v" id="roEra">1971 · BEFORE THE NAME</span></div>
@@ -163,8 +117,6 @@
     <div class="lower">
       <p class="recursion" id="recursion">TOMORROW BECOMES THE NEXT YESTERDAY &middot; THE DOOR HE BUILDS IS THE DOOR HIS CHILDREN WALK THROUGH &middot; <b>LOOP SEEDED → MVT II: TODAY</b></p>
       <div class="titlecard" id="titlecard">
-        <div class="zafi-sokitra" id="tcSokitra"></div>
-        <div class="zafi-title" id="tcZafi" aria-hidden="true"></div>
         <div class="tc-in">
           <div class="tc-meta"><span class="yr" id="tcYr">1971 · BEFORE THE NAME</span><span class="bar"></span><span id="tcIdx">MEMORY 1 OF 7</span></div>
           <h2 class="tc-title" id="tcTitle">THE FIRST FALL</h2>
@@ -219,6 +171,6 @@
 
 <script src="https://w.soundcloud.com/player/api.js"></script>
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script src="chain.js?v=13"></script>
+<script src="chain.js?v=10"></script>
 </body>
 </html>
