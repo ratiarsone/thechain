@@ -12,7 +12,11 @@
   "use strict";
 
   var STORE = "thechain_mvt1_green_v1";
-  var HAIZINA_PAGE = "https://soundcloud.com/parkdl/haizina-drum-bass-piano/s-hPaOloeJk62";
+  var SCORE_CUE = [
+    { label: "HAIZINA", page: "https://soundcloud.com/parkdl/haizina-drum-bass-piano/s-hPaOloeJk62", api: "https://api.soundcloud.com/tracks/2246396927", secret: "s-hPaOloeJk62" },
+    { label: "THE STAIRS", page: "https://soundcloud.com/parkdl/the-stairs-ruff-mix/s-6ZWiZALOuLX", api: "https://api.soundcloud.com/tracks/2282565227", secret: "s-6ZWiZALOuLX" },
+    { label: "THE WEIGHT", page: "https://soundcloud.com/parkdl/the-weight-2-w-guits/s-4LV9f9lZ7rW", api: "https://api.soundcloud.com/tracks/2272915949", secret: "s-4LV9f9lZ7rW" }
+  ];
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   var FRAGS = [
@@ -342,35 +346,60 @@
   });
 
   // ============================================================
-  // SCORE + CLOCK + COLD OPEN
+  // SCORE CUE + CLOCK + COLD OPEN
   // ============================================================
-  var haizinaIframe = document.getElementById("haizinaPlayer");
+  var scoreIframe = document.getElementById("haizinaPlayer");
+  var scoreLabel = document.getElementById("scoreLabel");
   var scWidget = null;
   var scReady = false;
-  var haizinaAutoplayPending = false;
+  var scoreAutoplayPending = false;
+  var cueIdx = 0;
 
-  function playHaizina() {
+  function scoreEmbedSrc(track) {
+    return "https://w.soundcloud.com/player/?visual=false&url=" + encodeURIComponent(track.api) +
+      "&secret_token=" + encodeURIComponent(track.secret) +
+      "&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false&show_artwork=false&color=%2346ff97";
+  }
+
+  function updateScoreLabel() {
+    var t = SCORE_CUE[cueIdx];
+    if (scoreLabel && t) scoreLabel.textContent = t.label;
+    if (score && t) score.setAttribute("aria-label", "Play score — " + t.label);
+  }
+
+  function playScore() {
     if (!scWidget) return;
     if (scReady) {
       scWidget.play();
       return;
     }
-    if (haizinaAutoplayPending) return;
-    haizinaAutoplayPending = true;
-    scWidget.bind(SC.Widget.Events.READY, function () {
-      scReady = true;
-      haizinaAutoplayPending = false;
-      scWidget.play();
-    });
+    if (scoreAutoplayPending) return;
+    scoreAutoplayPending = true;
   }
 
-  function toggleHaizinaPlayback() {
+  function loadScoreCue(i, autoplay) {
+    cueIdx = i;
+    updateScoreLabel();
+    var t = SCORE_CUE[i];
+    if (!t || !scWidget) return;
+    scoreAutoplayPending = !!autoplay;
+    scReady = false;
+    scWidget.load(t.page, { auto_play: !!autoplay });
+  }
+
+  function advanceScoreCue() {
+    if (cueIdx + 1 < SCORE_CUE.length) loadScoreCue(cueIdx + 1, true);
+    else score.classList.remove("playing");
+  }
+
+  function toggleScorePlayback() {
+    var t = SCORE_CUE[cueIdx];
     if (!scWidget) {
-      window.open(HAIZINA_PAGE, "_blank", "noopener,noreferrer");
+      window.open(t ? t.page : SCORE_CUE[0].page, "_blank", "noopener,noreferrer");
       return;
     }
     if (!scReady) {
-      playHaizina();
+      playScore();
       return;
     }
     scWidget.isPaused(function (paused) {
@@ -379,35 +408,37 @@
     });
   }
 
-  function initHaizina() {
-    if (!haizinaIframe || !window.SC || !window.SC.Widget) return;
-    scWidget = SC.Widget(haizinaIframe);
+  function initScore() {
+    if (!scoreIframe || !window.SC || !window.SC.Widget) return;
+    scWidget = SC.Widget(scoreIframe);
     scWidget.bind(SC.Widget.Events.READY, function () {
       scReady = true;
-      if (haizinaAutoplayPending) {
-        haizinaAutoplayPending = false;
+      updateScoreLabel();
+      if (scoreAutoplayPending) {
+        scoreAutoplayPending = false;
         scWidget.play();
       }
     });
     scWidget.bind(SC.Widget.Events.PLAY, function () { score.classList.add("playing"); });
     scWidget.bind(SC.Widget.Events.PAUSE, function () { score.classList.remove("playing"); });
-    scWidget.bind(SC.Widget.Events.FINISH, function () { score.classList.remove("playing"); });
-    playHaizina();
+    scWidget.bind(SC.Widget.Events.FINISH, advanceScoreCue);
+    updateScoreLabel();
+    playScore();
   }
 
-  function bootHaizinaFromHome() {
-    playHaizina();
+  function bootScoreFromHome() {
+    playScore();
   }
 
-  document.body.addEventListener("pointerdown", bootHaizinaFromHome, { once: true });
-  document.body.addEventListener("keydown", bootHaizinaFromHome, { once: true });
+  document.body.addEventListener("pointerdown", bootScoreFromHome, { once: true });
+  document.body.addEventListener("keydown", bootScoreFromHome, { once: true });
 
-  score.addEventListener("click", toggleHaizinaPlayback);
+  score.addEventListener("click", toggleScorePlayback);
 
-  if (window.SC && window.SC.Widget) initHaizina();
+  if (window.SC && window.SC.Widget) initScore();
   else {
     var scApi = document.querySelector('script[src*="soundcloud.com/player/api"]');
-    if (scApi) scApi.addEventListener("load", initHaizina);
+    if (scApi) scApi.addEventListener("load", initScore);
   }
 
   var frames = 0, clockTimer = null;
@@ -610,7 +641,7 @@
     buildRoster();
     highlightChar(csPick);
     charSelect.classList.remove("gone");
-    bootHaizinaFromHome();
+    bootScoreFromHome();
   }
   init();
 })();

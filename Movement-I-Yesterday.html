@@ -64,19 +64,19 @@
       <span class="tcode" id="masterTc">00:00:00:00</span>
     </div>
     <div class="brand">
-      <button class="haizina" id="score" aria-label="Play score Haizina">
+      <button class="haizina" id="score" aria-label="Play score — HAIZINA">
         <span class="pp"><svg class="ic-play" viewBox="0 0 10 10"><path d="M1 0 L9 5 L1 10Z"/></svg><svg class="ic-pause" viewBox="0 0 10 10"><rect x="1" y="0" width="3" height="10"/><rect x="6" y="0" width="3" height="10"/></svg></span>
-        <span class="nm hide-sm">HAIZINA</span>
+        <span class="nm hide-sm" id="scoreLabel">HAIZINA</span>
         <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
       </button>
     </div>
   </div>
 
-  <!-- Hidden SoundCloud player — audio only, controlled by HAIZINA button -->
+  <!-- Hidden SoundCloud player — score cue (Haizina → The Stairs) -->
   <div class="haizina-audio" aria-hidden="true">
     <iframe
       id="haizinaPlayer"
-      title="Haizina — drum bass piano by ParkDL"
+      title="Score cue — ParkDL"
       scrolling="no"
       frameborder="no"
       allow="autoplay"
@@ -171,6 +171,6 @@
 
 <script src="https://w.soundcloud.com/player/api.js"></script>
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script src="chain.js?v=11"></script>
+<script src="chain.js?v=13"></script>
 </body>
 </html>
