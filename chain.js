@@ -24,32 +24,32 @@
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   var FRAGS = [
-    { id: "fall", recv: 1, cue: 1, tc: "00:00", era: "1971 · before the name", title: "THE FIRST FALL",
+    { id: "fall", recv: 1, cue: 1, backgroundImage: "/img/mvt1/Ranavalona_II,_photograph.png", tc: "00:00", era: "1971 · before the name", title: "THE FIRST FALL",
       line: "\u201cTonga le boay keliko.\u201d \u2014 the sentence that began the severance.",
       roles: [{ t: "THE NOBLE", lead: true }, { t: "THE DISOWNED" }],
       outer: "The line is cut before he even has a name. Something that was meant to keep flowing \u2014 hasina \u2014 goes quiet here first, and the long cut from the ancestors begins.",
       inner: { g: "NO ONE GUARDING YET", line: "A debt opened with no one yet alive to owe it.", seed: "a verdict, still looking for someone to land on", idle: true } },
-    { id: "blessing", recv: 2, cue: 2, tc: "04:12", era: "childhood · the blessing", title: "THE DOOR AGAINST THE WALL",
+    { id: "blessing", recv: 2, cue: 2, backgroundImage: "/img/mvt1/DP144486.jpg", tc: "04:12", era: "childhood · the blessing", title: "THE DOOR AGAINST THE WALL",
       line: "A tso-drano laid like a hand on the head \u2014 and like a seal on a door.",
       roles: [{ t: "THE GRANDMOTHER", lead: true }],
       outer: "Protection and the cage arrive in one gesture. The first lesson: safety has walls.",
       inner: { g: "THE PROSECUTOR ARRIVES", line: "Watch yourself first, before anyone outside can.", seed: "the part of him that watches him first" } },
-    { id: "backseat", recv: 3, cue: 3, tc: "09:48", era: "childhood · the language", title: "TAUGHT BEFORE HE COULD SPELL IT",
+    { id: "backseat", recv: 3, cue: 3, backgroundImage: "/img/mvt1/Rainandriamampandry_ex_gouverneur_de_Tamatave_et_sa_famille.jpg", tc: "09:48", era: "childhood · the language", title: "TAUGHT BEFORE HE COULD SPELL IT",
       line: "The caste vocabulary, passed back over the seat, in the voice of the people who love him.",
       roles: [{ t: "THE DOCTOR", lead: true }, { t: "THE SON", lead: true }],
       outer: "It comes in through care and language, before he can even read. It wears the face of love. What's hurting him is never them \u2014 it's what speaks through them: mpanandevo, fanompoana.",
       inner: { g: "THE PROSECUTOR, AT HIS POST", line: "Convict yourself first, and no one outside can.", seed: "the voice that agrees with them before they finish" } },
-    { id: "glass", recv: 4, cue: 4, tc: "14:30", era: "childhood · the separation", title: "THE MOTHER ON THE FAR SIDE",
+    { id: "glass", recv: 4, cue: 4, backgroundImage: "/img/mvt1/The_Mother_on_the_Far_Side.jpg", tc: "14:30", era: "childhood · the separation", title: "THE MOTHER ON THE FAR SIDE",
       line: "The airport glass \u2014 close enough to see, never close enough to hold.",
       roles: [{ t: "THE DOCTOR", lead: true }],
       outer: "Separation rehearsed until it feels like weather. What you reach for lives behind something clear and hard.",
       inner: { g: "THE SABOTEUR ARRIVES", line: "It hurts less if you decide you never wanted it.", seed: "the part that talks him out of reaching" } },
-    { id: "sudbury", recv: 5, cue: 5, tc: "19:06", era: "childhood · the shelter", title: "THE CAGE THAT WAS ALSO THE SHELTER",
+    { id: "sudbury", recv: 5, cue: 5, backgroundImage: null, tc: "19:06", era: "childhood · the shelter", title: "THE CAGE THAT WAS ALSO THE SHELTER",
       line: "The only safe room had a lock on the inside and the outside both.",
       roles: [{ t: "THE CAGE" }],
       outer: "Smallness bought safety; safety required smallness. To be protected is to be contained, and to be contained is to be safe.",
       inner: { g: "THE PUNISHER ARRIVES", line: "Stay small and you stay safe; step out and you'll pay.", seed: "the part that makes trying hurt" } },
-    { id: "installed", recv: 6, cue: 0, tc: "31:00", era: "Haizina · the darkness, lowest", title: "IT RUNS ON ITS OWN NOW", terminus: true, locked: true,
+    { id: "installed", recv: 6, cue: 0, backgroundImage: "/img/mvt1/DP144490.jpg", tc: "31:00", era: "Haizina · the darkness, lowest", title: "IT RUNS ON ITS OWN NOW", terminus: true, locked: true,
       line: "Not a new thing that happened \u2014 the weight of all the others, carried now without anyone choosing to.",
       roles: [{ t: "HAIZINA", lead: true }],
       outer: "By now it just runs, on its own. What was hurting him was never the people who loved him \u2014 it was what spoke through them: mpanandevo, fanompoana, Babylon. The way out isn't escape, and it isn't revenge. It's being seen \u2014 and that's Tomorrow.",
@@ -133,9 +133,14 @@
   var tcIdx = document.getElementById("tcIdx");
   var tcTitle = document.getElementById("tcTitle");
   var tcLine = document.getElementById("tcLine");
+  var memBg = document.getElementById("memBg");
+  var memBgA = document.getElementById("memBgA");
+  var memBgB = document.getElementById("memBgB");
 
   var RING_R = 178;
   var nodeEls = {};
+  var memBgSlot = 0;
+  var memBgReady = {};
 
   // ============================================================
   // ORBIT
@@ -272,6 +277,58 @@
   // ============================================================
   // RENDER active fragment into CG card + readout
   // ============================================================
+  function preloadMemoryBackgrounds() {
+    FRAGS.forEach(function (f) {
+      if (!f.backgroundImage) return;
+      var img = new Image();
+      img.onload = function () { memBgReady[f.backgroundImage] = true; };
+      img.onerror = function () { memBgReady[f.backgroundImage] = false; };
+      img.src = f.backgroundImage;
+    });
+  }
+
+  function hideMemoryBackground() {
+    if (memBg) memBg.classList.remove("visible");
+  }
+
+  function updateMemoryBackground(f) {
+    if (!memBg || !memBgA || !memBgB) return;
+    if (!state.opened || !f || !f.backgroundImage) {
+      hideMemoryBackground();
+      return;
+    }
+    var src = f.backgroundImage;
+    if (memBgReady[src] === false) {
+      hideMemoryBackground();
+      return;
+    }
+    if (memBgReady[src] !== true) {
+      var probe = new Image();
+      probe.onload = function () {
+        memBgReady[src] = true;
+        updateMemoryBackground(f);
+      };
+      probe.onerror = function () {
+        memBgReady[src] = false;
+        hideMemoryBackground();
+      };
+      probe.src = src;
+      return;
+    }
+    var active = memBgSlot === 0 ? memBgA : memBgB;
+    var next = memBgSlot === 0 ? memBgB : memBgA;
+    var cur = active.style.backgroundImage;
+    if (cur && cur.indexOf(src) !== -1) {
+      memBg.classList.add("visible");
+      return;
+    }
+    next.style.backgroundImage = "url(\"" + src + "\")";
+    active.classList.remove("is-active");
+    next.classList.add("is-active");
+    memBgSlot = 1 - memBgSlot;
+    memBg.classList.add("visible");
+  }
+
   function render(f) {
     tcYr.textContent = f.era.toUpperCase();
     tcIdx.textContent = "MEMORY " + f.recv + " OF " + TOTAL;
@@ -295,6 +352,7 @@
       roSeedTxt.textContent = "it was never them";
       roSeed.classList.remove("idle");
     }
+    updateMemoryBackground(f);
   }
 
   // ============================================================
@@ -616,6 +674,7 @@
   function goHome() {
     if (!charSelect.classList.contains("gone")) return;
     state.opened = false;
+    hideMemoryBackground();
     openRoster();
     save();
   }
@@ -660,6 +719,7 @@
     ordReceived.setAttribute("aria-pressed", state.order === "received" ? "true" : "false");
     setOrderNote();
     ring.classList.remove("idle");
+    preloadMemoryBackgrounds();
     buildNodes();
     updateMeter();
     if (state.witnessed.indexOf("installed") !== -1) { crt.classList.add("installed"); coreSeed.innerHTML = "IT HOLDS<br>ON ITS OWN"; }
