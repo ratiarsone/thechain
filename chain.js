@@ -822,6 +822,10 @@
     });
     scWidget.bind(SC.Widget.Events.PLAY, function () {
       score.classList.add("playing");
+      if (charSelect && !charSelect.classList.contains("gone")) {
+        scWidget.setVolume(100);
+        return;
+      }
       syncMusicToClarity(getMemState(state.active).seen ? 1 : getMemState(state.active).clarity, getMemState(state.active).seen);
     });
     scWidget.bind(SC.Widget.Events.PAUSE, function () { score.classList.remove("playing"); });
@@ -1231,10 +1235,19 @@
     fTags.innerHTML = (locked ? '<span class="ftag">LOCKED</span>' : '<span class="ftag">MEMORY ' + c.p + ' OF ' + TOTAL + '</span>');
   }
 
+  function playRosterScore(id) {
+    if (charLocked(id)) {
+      pauseScore();
+      return;
+    }
+    startScoreForMemory(id, true);
+  }
+
   function previewChar(id) {
     if (!CHARS[id] || csHover === id) return;
     csHover = id;
     paintFeatured(id);
+    playRosterScore(id);
   }
 
   function rosterPreviewTarget(e) {
@@ -1282,6 +1295,7 @@
     if (!csHover) return;
     csHover = null;
     paintFeatured(csPick);
+    playRosterScore(csPick);
   }
 
   function highlightChar(id) {
