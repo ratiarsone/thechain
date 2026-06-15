@@ -12,6 +12,7 @@
   "use strict";
 
   var STORE = "thechain_mvt1_green_v1";
+  var HAIZINA_TRACK = "https://soundcloud.com/parkdl/haizina-drum-bass-piano/s-hPaOloeJk62";
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   var FRAGS = [
@@ -343,7 +344,47 @@
   // ============================================================
   // SCORE + CLOCK + COLD OPEN
   // ============================================================
-  score.addEventListener("click", function () { score.classList.toggle("playing"); });
+  var scWidget = null;
+
+  function initHaizina() {
+    var iframe = document.createElement("iframe");
+    iframe.id = "haizinaPlayer";
+    iframe.title = "Haizina score";
+    iframe.setAttribute("allow", "autoplay");
+    iframe.style.cssText = "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;border:0;";
+    iframe.src = "https://w.soundcloud.com/player/?url=" + encodeURIComponent(HAIZINA_TRACK) +
+      "&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false&visual=false";
+    document.body.appendChild(iframe);
+
+    function wireWidget() {
+      scWidget = SC.Widget(iframe);
+      scWidget.bind(SC.Widget.Events.PLAY, function () { score.classList.add("playing"); });
+      scWidget.bind(SC.Widget.Events.PAUSE, function () { score.classList.remove("playing"); });
+      scWidget.bind(SC.Widget.Events.FINISH, function () { score.classList.remove("playing"); });
+    }
+
+    if (window.SC && window.SC.Widget) {
+      wireWidget();
+      return;
+    }
+    var api = document.createElement("script");
+    api.src = "https://w.soundcloud.com/player/api.js";
+    api.onload = wireWidget;
+    document.head.appendChild(api);
+  }
+
+  score.addEventListener("click", function () {
+    if (scWidget) {
+      scWidget.isPaused(function (paused) {
+        if (paused) scWidget.play();
+        else scWidget.pause();
+      });
+      return;
+    }
+    window.open(HAIZINA_TRACK, "_blank", "noopener,noreferrer");
+  });
+
+  initHaizina();
 
   var frames = 0, clockTimer = null;
   function startClock() {
