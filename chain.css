@@ -183,16 +183,17 @@ body.memory-open .stage { top: calc(var(--bar-h) + var(--crumb-h)); }
 .haizina .eq i:nth-child(2){animation-delay:.1s}.haizina .eq i:nth-child(3){animation-delay:.22s}.haizina .eq i:nth-child(4){animation-delay:.34s}.haizina .eq i:nth-child(5){animation-delay:.16s}
 @keyframes eq { from{height:20%} to{height:100%} }
 
-/* Hidden SoundCloud audio — off-screen but sized for the widget API */
+/* Hidden SoundCloud audio — in-viewport but invisible (off-screen iframes get muted) */
 .haizina-audio {
   position: fixed;
-  left: -9999px;
-  top: 0;
+  right: 0;
+  bottom: 0;
   width: 166px;
   height: 166px;
   overflow: hidden;
-  opacity: 0;
+  opacity: 0.01;
   pointer-events: none;
+  z-index: 1;
 }
 .haizina-audio iframe {
   display: block;

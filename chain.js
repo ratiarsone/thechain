@@ -279,7 +279,8 @@
 
   function syncMusicToClarity(c, seen) {
     if (!scWidget || !scReady) return;
-    var vol = Math.round((seen ? 1 : Math.max(0.22, c)) * 100);
+    if (!score.classList.contains("playing")) return;
+    var vol = Math.round((seen ? 1 : Math.max(0.45, c)) * 100);
     scWidget.setVolume(Math.max(0, Math.min(100, vol)));
   }
 
@@ -522,9 +523,8 @@
     render(f);
     refreshNodes();
     if (state.opened) {
-      var ms = getMemState(id);
-      startScoreForMemory(id, ms.seen || scoreGestureUnlocked);
-      syncMusicToClarity(ms.seen ? 1 : ms.clarity, ms.seen);
+      startScoreForMemory(id, true);
+      syncMusicToClarity(getMemState(id).seen ? 1 : Math.max(0.45, getMemState(id).clarity), getMemState(id).seen);
     }
     developPointer = false;
     developSpace = false;
@@ -730,12 +730,14 @@
   var scoreLabel = document.getElementById("scoreLabel");
   var scWidget = null;
   var scReady = false;
+  var scLoadPending = false;
+  var loadedCueIdx = -1;
   var scoreAutoplayPending = false;
   var pendingCue = null;
   var pendingAutoplay = false;
   var cueIdx = 0;
   var scoreGestureUnlocked = false;
-  var pendingCueIdx = null;
+  var scoreInited = false;
 
   function unlockScoreGesture() {
     scoreGestureUnlocked = true;
@@ -774,26 +776,34 @@
     loadScoreCue(scoreCueFor(id), false);
   }
 
-  function tryPlayScore() {
+  function ensureScorePlaying(vol) {
     if (!scWidget || !scReady) {
       scoreAutoplayPending = true;
       return;
     }
-    scWidget.setVolume(100);
+    scWidget.setVolume(typeof vol === "number" ? vol : 100);
     scWidget.play();
   }
 
+  function tryPlayScore() {
+    ensureScorePlaying(100);
+  }
+
   function waitAndPlayScore() {
-    tryPlayScore();
-    if (scWidget && scReady) return;
+    if (scWidget && scReady && !scLoadPending) {
+      tryPlayScore();
+      return;
+    }
+    scoreAutoplayPending = true;
     var tries = 0;
     var poll = setInterval(function () {
       tries++;
-      if (scWidget && scReady) {
+      if (scWidget && scReady && !scLoadPending) {
         clearInterval(poll);
+        scoreAutoplayPending = false;
         tryPlayScore();
-      } else if (tries > 50) clearInterval(poll);
-    }, 80);
+      } else if (tries > 80) clearInterval(poll);
+    }, 100);
   }
 
   function playScoreCueNow(i) {
@@ -805,22 +815,21 @@
     var t = SCORE_CUE[i];
     if (!t) return;
     var shouldPlay = !!autoplay;
-    if (scWidget && scReady && cueIdx === i) {
-      cueIdx = i;
-      updateScoreLabel();
+    cueIdx = i;
+    updateScoreLabel();
+    if (scWidget && scReady && !scLoadPending && loadedCueIdx === i) {
       if (shouldPlay) waitAndPlayScore();
       return;
     }
-    cueIdx = i;
-    updateScoreLabel();
     if (!scWidget) {
       pendingCue = i;
       pendingAutoplay = shouldPlay;
       if (scoreIframe) scoreIframe.src = scoreEmbedSrc(t, shouldPlay);
       return;
     }
-    pendingCueIdx = i;
     scoreAutoplayPending = shouldPlay;
+    scReady = false;
+    scLoadPending = true;
     scWidget.load(t.page, { auto_play: shouldPlay });
   }
 
@@ -830,26 +839,30 @@
   }
 
   function toggleScorePlayback() {
+    unlockScoreGesture();
     var t = SCORE_CUE[cueIdx];
     if (!scWidget) {
       window.open(t ? t.page : SCORE_CUE[0].page, "_blank", "noopener,noreferrer");
       return;
     }
-    if (!scReady) {
+    if (!scReady || scLoadPending) {
       scoreAutoplayPending = true;
       return;
     }
     scWidget.isPaused(function (paused) {
-      if (paused) scWidget.play();
+      if (paused) ensureScorePlaying(100);
       else scWidget.pause();
     });
   }
 
   function initScore() {
-    if (!scoreIframe || !window.SC || !window.SC.Widget) return;
+    if (scoreInited || !scoreIframe || !window.SC || !window.SC.Widget) return;
+    scoreInited = true;
     scWidget = SC.Widget(scoreIframe);
     scWidget.bind(SC.Widget.Events.READY, function () {
       scReady = true;
+      scLoadPending = false;
+      loadedCueIdx = cueIdx;
       updateScoreLabel();
       if (pendingCue !== null) {
         var i = pendingCue;
@@ -859,13 +872,9 @@
         loadScoreCue(i, ap);
         return;
       }
-      if (pendingCueIdx !== null && pendingCueIdx !== cueIdx) {
-        pendingCueIdx = null;
-      }
       if (scoreAutoplayPending) {
         scoreAutoplayPending = false;
-        if (charSelect && !charSelect.classList.contains("gone")) tryPlayScore();
-        else scWidget.play();
+        ensureScorePlaying(100);
       }
     });
     scWidget.bind(SC.Widget.Events.PLAY, function () {
@@ -874,7 +883,8 @@
         scWidget.setVolume(100);
         return;
       }
-      syncMusicToClarity(getMemState(state.active).seen ? 1 : getMemState(state.active).clarity, getMemState(state.active).seen);
+      var ms = getMemState(state.active);
+      syncMusicToClarity(ms.seen ? 1 : Math.max(0.45, ms.clarity), ms.seen);
     });
     scWidget.bind(SC.Widget.Events.PAUSE, function () { score.classList.remove("playing"); });
     scWidget.bind(SC.Widget.Events.FINISH, advanceScoreCue);
@@ -1367,7 +1377,6 @@
   function enterWith(id) {
     if (charLocked(id)) return;
     unlockScoreGesture();
-    playScoreCueNow(scoreCueFor(id));
     charSelect.classList.add("gone");
     if (tv) tv.stop();
     state.opened = true;
