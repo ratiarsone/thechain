@@ -192,31 +192,31 @@ button { font-family: inherit; color: inherit; }
 .mem-bg.visible { opacity: 1; }
 .mem-bg-layer {
   position: absolute; inset: 0;
-  background-size: cover; background-position: center; background-repeat: no-repeat;
+  background-size: cover; background-position: center 38%; background-repeat: no-repeat;
   opacity: 0;
   transition: opacity 0.85s var(--ease);
-  filter: saturate(0.32) contrast(1.08) brightness(0.52);
+  filter: saturate(0.45) contrast(1.05) brightness(0.78);
 }
 .mem-bg-layer.is-active { opacity: 1; }
 .mem-bg-layer::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: rgba(70, 255, 151, 0.24);
+  background: rgba(70, 255, 151, 0.14);
   mix-blend-mode: multiply;
 }
 body[data-channel="inner"] .mem-bg-layer {
-  filter: saturate(0.18) contrast(1.12) brightness(0.46);
+  filter: saturate(0.35) contrast(1.08) brightness(0.72);
 }
 body[data-channel="inner"] .mem-bg-layer::after {
-  background: rgba(255, 85, 70, 0.3);
+  background: rgba(255, 85, 70, 0.18);
 }
 .mem-bg-scrim {
   position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background:
-    radial-gradient(125% 125% at 50% 50%, rgba(0,0,0,0.28) 42%, rgba(0,0,0,0.82) 100%),
-    rgba(0, 0, 0, 0.6);
+    radial-gradient(125% 125% at 50% 55%, rgba(0,0,0,0.12) 45%, rgba(0,0,0,0.55) 100%),
+    rgba(0, 0, 0, 0.32);
 }
 .mem-bg-scanlines {
-  position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0.35;
+  position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0.22;
   background: repeating-linear-gradient(0deg, rgba(0,0,0,0) 0 2px, rgba(0,0,0,0.28) 2.5px, rgba(0,0,0,0) 4px);
   mix-blend-mode: multiply;
 }
