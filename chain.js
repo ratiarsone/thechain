@@ -109,6 +109,7 @@
   var rosterBtn = document.getElementById("rosterBtn");
   var masterTc = document.getElementById("masterTc");
   var score = document.getElementById("score");
+  var brandHome = document.getElementById("brandHome");
   var chOuter = document.getElementById("chOuter");
   var chInner = document.getElementById("chInner");
   var ordRemembered = document.getElementById("ordRemembered");
@@ -358,6 +359,8 @@
   var scWidget = null;
   var scReady = false;
   var scoreAutoplayPending = false;
+  var pendingCue = null;
+  var pendingAutoplay = false;
   var cueIdx = 0;
 
   function scoreEmbedSrc(track) {
@@ -372,16 +375,6 @@
     if (score && t) score.setAttribute("aria-label", "Play score — " + t.label);
   }
 
-  function playScore() {
-    if (!scWidget) return;
-    if (scReady) {
-      scWidget.play();
-      return;
-    }
-    if (scoreAutoplayPending) return;
-    scoreAutoplayPending = true;
-  }
-
   function scoreCueFor(id) {
     var f = byId[id];
     return f && typeof f.cue === "number" ? f.cue : 0;
@@ -391,8 +384,12 @@
     loadScoreCue(scoreCueFor(id), autoplay !== false);
   }
 
+  function pauseScore() {
+    if (scWidget && scReady) scWidget.pause();
+    score.classList.remove("playing");
+  }
+
   function previewScoreForMemory(id) {
-    if (state.opened) return;
     loadScoreCue(scoreCueFor(id), false);
   }
 
@@ -400,7 +397,13 @@
     cueIdx = i;
     updateScoreLabel();
     var t = SCORE_CUE[i];
-    if (!t || !scWidget) return;
+    if (!t) return;
+    if (!scWidget) {
+      pendingCue = i;
+      pendingAutoplay = !!autoplay;
+      if (scoreIframe) scoreIframe.src = scoreEmbedSrc(t);
+      return;
+    }
     scoreAutoplayPending = !!autoplay;
     scReady = false;
     scWidget.load(t.page, { auto_play: !!autoplay });
@@ -418,7 +421,7 @@
       return;
     }
     if (!scReady) {
-      playScore();
+      scoreAutoplayPending = true;
       return;
     }
     scWidget.isPaused(function (paused) {
@@ -433,6 +436,14 @@
     scWidget.bind(SC.Widget.Events.READY, function () {
       scReady = true;
       updateScoreLabel();
+      if (pendingCue !== null) {
+        var i = pendingCue;
+        var ap = pendingAutoplay;
+        pendingCue = null;
+        pendingAutoplay = false;
+        loadScoreCue(i, ap);
+        return;
+      }
       if (scoreAutoplayPending) {
         scoreAutoplayPending = false;
         scWidget.play();
@@ -442,15 +453,7 @@
     scWidget.bind(SC.Widget.Events.PAUSE, function () { score.classList.remove("playing"); });
     scWidget.bind(SC.Widget.Events.FINISH, advanceScoreCue);
     updateScoreLabel();
-    playScore();
   }
-
-  function bootScoreFromHome() {
-    playScore();
-  }
-
-  document.body.addEventListener("pointerdown", bootScoreFromHome, { once: true });
-  document.body.addEventListener("keydown", bootScoreFromHome, { once: true });
 
   score.addEventListener("click", toggleScorePlayback);
 
@@ -602,15 +605,26 @@
   }
 
   function openRoster() {
+    pauseScore();
+    stopIdle();
     buildRoster();
     highlightChar(charLocked(csPick) ? RECEIVED[0] : csPick);
     charSelect.classList.remove("gone");
     if (tv) { tv.resize(); tv.start(); }
   }
+
+  function goHome() {
+    if (!charSelect.classList.contains("gone")) return;
+    state.opened = false;
+    openRoster();
+    save();
+  }
+
   window.addEventListener("resize", function () { if (tv) tv.resize(); });
 
   csEnter.addEventListener("click", function () { if (!charLocked(csPick)) enterWith(csPick); });
-  rosterBtn.addEventListener("click", openRoster);
+  rosterBtn.addEventListener("click", goHome);
+  if (brandHome) brandHome.addEventListener("click", goHome);
   document.addEventListener("keydown", function (e) {
     if (charSelect.classList.contains("gone")) return;
     var i = RECEIVED.indexOf(csPick);
@@ -661,7 +675,6 @@
     buildRoster();
     highlightChar(csPick);
     charSelect.classList.remove("gone");
-    bootScoreFromHome();
   }
   init();
 })();

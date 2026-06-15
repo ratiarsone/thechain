@@ -103,23 +103,39 @@ button { font-family: inherit; color: inherit; }
 .bloom { position: absolute; inset: 0; z-index: 53; pointer-events: none; box-shadow: inset 0 0 160px rgba(70,255,151,0.06); }
 
 /* ============================================================
-   CG BARS (top + bottom)
+   APP CHROME (fixed home + score)
    ============================================================ */
-.cg-top, .cg-bottom {
+.app-chrome {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  height: var(--bar-h);
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0 clamp(0.8rem, 2.5vw, 1.8rem);
+  border-bottom: 1px solid var(--grn-faint);
+  background: linear-gradient(180deg, rgba(3,18,12,0.96), rgba(2,10,7,0.88));
+}
+.brand-home {
+  display: flex; align-items: center; gap: 0.7rem;
+  background: none; border: 0; padding: 0; cursor: pointer; text-align: left;
+}
+.brand-home:hover .mk { color: var(--grn); }
+.brand-home .mk { font-family: var(--disp); font-weight: 700; letter-spacing: 0.06em; font-size: 1.02rem; color: var(--grn-hi); text-shadow: var(--glow); transition: color 0.15s var(--ease); }
+.brand-home .mk i { color: var(--grn); font-style: normal; }
+.brand-home .os { font-size: 0.6rem; letter-spacing: 0.24em; color: var(--grn-dim); border-left: 1px solid var(--grn-faint); padding-left: 0.7rem; }
+
+/* ============================================================
+   CG BARS (bottom)
+   ============================================================ */
+.cg-bottom {
   position: absolute; left: 0; right: 0; z-index: 40;
   display: flex; align-items: center; gap: 1rem;
   padding: 0 clamp(0.8rem, 2.5vw, 1.8rem);
   background: linear-gradient(180deg, rgba(3,18,12,0.92), rgba(2,10,7,0.7));
+  bottom: 0; min-height: var(--foot-h); border-top: 1px solid var(--grn-faint);
+  justify-content: space-between; align-items: stretch; padding-top: 10px; padding-bottom: 18px; flex-wrap: wrap;
 }
-.cg-top { top: 0; height: var(--bar-h); border-bottom: 1px solid var(--grn-faint); justify-content: space-between; }
-.cg-bottom { bottom: 0; min-height: var(--foot-h); border-top: 1px solid var(--grn-faint); justify-content: space-between; align-items: stretch; padding-top: 10px; padding-bottom: 18px; flex-wrap: wrap; }
-
-.brand { display: flex; align-items: center; gap: 0.7rem; }
-.brand .mk { font-family: var(--disp); font-weight: 700; letter-spacing: 0.06em; font-size: 1.02rem; color: var(--grn-hi); text-shadow: var(--glow); }
-.brand .mk i { color: var(--grn); font-style: normal; }
-.brand .os { font-size: 0.6rem; letter-spacing: 0.24em; color: var(--grn-dim); border-left: 1px solid var(--grn-faint); padding-left: 0.7rem; }
 
 .top-mid { display: flex; align-items: center; gap: clamp(0.7rem,2vw,1.6rem); font-size: 0.66rem; letter-spacing: 0.18em; }
+.app-chrome .top-mid { flex: 1; justify-content: center; min-width: 0; }
 .mv-tag { color: var(--grn-soft); }
 .mv-tag b { color: var(--grn-hi); font-weight: 400; text-shadow: var(--glow); }
 .rec { display: inline-flex; align-items: center; gap: 0.5ch; color: var(--red); }
@@ -128,7 +144,7 @@ button { font-family: inherit; color: inherit; }
 .tcode { color: var(--grn-hi); letter-spacing: 0.1em; text-shadow: var(--glow); font-variant-numeric: tabular-nums; }
 
 /* Haizina meter */
-.haizina { display: inline-flex; align-items: center; gap: 0.55rem; cursor: pointer; padding: 4px 9px; border: 1px solid var(--grn-faint); }
+.haizina { display: inline-flex; align-items: center; gap: 0.55rem; cursor: pointer; padding: 4px 9px; border: 1px solid var(--grn-faint); background: none; }
 .haizina:hover { border-color: var(--grn-dim); }
 .haizina .pp { color: var(--grn); }
 .haizina .pp svg { width: 9px; height: 9px; fill: currentColor; display: block; }
@@ -394,6 +410,7 @@ body[data-channel="inner"] .ro-decode b { color: var(--red-soft); }
    ============================================================ */
 .charselect {
   position: fixed; inset: 0; z-index: 95;
+  padding-top: var(--bar-h);
   background: radial-gradient(130% 110% at 50% 0%, #06160f 0%, #010604 60%), #010604;
   display: flex; flex-direction: column; transition: opacity 0.55s var(--ease);
 }
