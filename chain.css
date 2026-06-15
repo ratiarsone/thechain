@@ -218,10 +218,10 @@ body.memory-open .stage { top: calc(var(--bar-h) + var(--crumb-h)); }
 .mem-bg.visible { opacity: 1; }
 .mem-bg-layer {
   position: absolute; inset: 0;
-  background-size: cover; background-position: center 8%; background-repeat: no-repeat;
+  background-size: cover; background-position: center top; background-repeat: no-repeat;
   opacity: 0;
   transition: opacity 0.85s var(--ease);
-  filter: saturate(0.45) contrast(1.05) brightness(0.84);
+  filter: saturate(0.48) contrast(1.04) brightness(0.88);
 }
 .mem-bg-layer.is-active { opacity: 1; }
 .mem-bg-layer::after {
