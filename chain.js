@@ -53,6 +53,36 @@
   var RECEIVED = FRAGS.slice().sort(function (a, b) { return a.recv - b.recv; }).map(function (f) { return f.id; });
   var REMEMBERED = ["backseat", "fall", "glass", "blessing", "sudbury", "installed"];
 
+  // Zafimaniry sokitra — one carved motif per memory
+  var ZAFI = {
+    fall: "web", blessing: "honey", backseat: "chevron",
+    glass: "diamond", sudbury: "rope", installed: "star"
+  };
+  var ZAFI_NAMES = {
+    web: "TANAMPARORATRA", honey: "PAPINTANTELY", chevron: "VOVONANA",
+    diamond: "TADY", rope: "VOLOVOLO", star: "KODIA"
+  };
+  function zafiSvg(id, cls) {
+    var key = ZAFI[id] || "honey";
+    return '<svg class="zafi-motif' + (cls ? " " + cls : "") + '" viewBox="0 0 48 48" aria-hidden="true"><use href="#zafi-' + key + '"/></svg>';
+  }
+  function zafiLabel(id) {
+    var key = ZAFI[id] || "honey";
+    return "SOKITRA \u00b7 " + (ZAFI_NAMES[key] || key.toUpperCase());
+  }
+  function applyZafi(id) {
+    var svg = zafiSvg(id);
+    var label = zafiLabel(id);
+    ["roZafi", "coreZafi", "tcZafi", "fZafi"].forEach(function (elId) {
+      var el = document.getElementById(elId);
+      if (el) el.innerHTML = svg;
+    });
+    ["roSokitra", "tcSokitra"].forEach(function (elId) {
+      var el = document.getElementById(elId);
+      if (el) el.textContent = label;
+    });
+  }
+
   // character roster — who hands the chain down, one per memory
   var CHARS = {
     fall:      { p:1, name:"THE NOBLE",       fac:"BLOOD", model:"noble",       hands:"Cuts the line before it ever reaches you \u2014 the first fall, 1971." },
@@ -152,6 +182,7 @@
       node.style.setProperty("--a", angleOf(f.id) + "deg");
       node.innerHTML =
         '<div class="badge" role="button" tabindex="0" aria-label="Fragment ' + f.recv + ': ' + f.title + '">' +
+          zafiSvg(f.id, "badge-motif") +
           '<span class="n">' + f.recv + '</span>' + linkSvg() +
         '</div>' +
         '<span class="tip">' + f.title + '</span>';
@@ -285,6 +316,7 @@
       roSeedTxt.textContent = "it was never them";
       roSeed.classList.remove("idle");
     }
+    applyZafi(f.id);
   }
 
   // ============================================================
@@ -347,6 +379,22 @@
   var haizinaIframe = document.getElementById("haizinaPlayer");
   var scWidget = null;
   var scReady = false;
+  var haizinaAutoplayPending = false;
+
+  function playHaizina() {
+    if (!scWidget) return;
+    if (scReady) {
+      scWidget.play();
+      return;
+    }
+    if (haizinaAutoplayPending) return;
+    haizinaAutoplayPending = true;
+    scWidget.bind(SC.Widget.Events.READY, function () {
+      scReady = true;
+      haizinaAutoplayPending = false;
+      scWidget.play();
+    });
+  }
 
   function toggleHaizinaPlayback() {
     if (!scWidget) {
@@ -354,10 +402,7 @@
       return;
     }
     if (!scReady) {
-      scWidget.bind(SC.Widget.Events.READY, function () {
-        scReady = true;
-        scWidget.play();
-      });
+      playHaizina();
       return;
     }
     scWidget.isPaused(function (paused) {
@@ -369,7 +414,13 @@
   function initHaizina() {
     if (!haizinaIframe || !window.SC || !window.SC.Widget) return;
     scWidget = SC.Widget(haizinaIframe);
-    scWidget.bind(SC.Widget.Events.READY, function () { scReady = true; });
+    scWidget.bind(SC.Widget.Events.READY, function () {
+      scReady = true;
+      if (haizinaAutoplayPending) {
+        haizinaAutoplayPending = false;
+        scWidget.play();
+      }
+    });
     scWidget.bind(SC.Widget.Events.PLAY, function () { score.classList.add("playing"); });
     scWidget.bind(SC.Widget.Events.PAUSE, function () { score.classList.remove("playing"); });
     scWidget.bind(SC.Widget.Events.FINISH, function () { score.classList.remove("playing"); });
@@ -469,6 +520,7 @@
       card.className = "char-card " + facClass(c.fac) + (locked ? " locked" : "");
       card.setAttribute("data-id", id);
       card.innerHTML =
+        '<span class="cc-zafi">' + zafiSvg(id) + '</span>' +
         '<span class="cc-idx">P' + c.p + '</span>' +
         '<span class="cc-dots">' + (locked ? '' : '<i></i><i></i><i></i>') + '</span>' +
         '<span class="cc-portrait">' + flatSVG(kindOf(c)) + '</span>' +
@@ -510,6 +562,7 @@
     csEnter.textContent = locked ? "\u25b6 LOCKED" : "\u25b6 OPEN THIS MEMORY";
     csEnter.disabled = locked;
     csEnter.style.opacity = locked ? "0.4" : "1";
+    applyZafi(id);
   }
 
   function enterWith(id) {
@@ -519,6 +572,7 @@
     state.opened = true;
     startClock();
     if (!reduceMotion) startIdle();
+    playHaizina();
     select(id, true);
     save();
   }
@@ -583,6 +637,7 @@
     buildRoster();
     highlightChar(csPick);
     charSelect.classList.remove("gone");
+    applyZafi(state.active || RECEIVED[0]);
   }
   init();
 })();
