@@ -12,7 +12,7 @@
   "use strict";
 
   var STORE = "thechain_mvt1_green_v1";
-  var HAIZINA_TRACK = "https://soundcloud.com/parkdl/haizina-drum-bass-piano/s-hPaOloeJk62";
+  var HAIZINA_PAGE = "https://soundcloud.com/parkdl/haizina-drum-bass-piano/s-hPaOloeJk62";
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   var FRAGS = [
@@ -344,47 +344,69 @@
   // ============================================================
   // SCORE + CLOCK + COLD OPEN
   // ============================================================
+  var haizinaPanel = document.getElementById("haizinaPanel");
+  var haizinaClose = document.getElementById("haizinaClose");
+  var haizinaIframe = document.getElementById("haizinaPlayer");
   var scWidget = null;
+  var scReady = false;
 
-  function initHaizina() {
-    var iframe = document.createElement("iframe");
-    iframe.id = "haizinaPlayer";
-    iframe.title = "Haizina score";
-    iframe.setAttribute("allow", "autoplay");
-    iframe.style.cssText = "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;border:0;";
-    iframe.src = "https://w.soundcloud.com/player/?url=" + encodeURIComponent(HAIZINA_TRACK) +
-      "&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false&visual=false";
-    document.body.appendChild(iframe);
-
-    function wireWidget() {
-      scWidget = SC.Widget(iframe);
-      scWidget.bind(SC.Widget.Events.PLAY, function () { score.classList.add("playing"); });
-      scWidget.bind(SC.Widget.Events.PAUSE, function () { score.classList.remove("playing"); });
-      scWidget.bind(SC.Widget.Events.FINISH, function () { score.classList.remove("playing"); });
-    }
-
-    if (window.SC && window.SC.Widget) {
-      wireWidget();
-      return;
-    }
-    var api = document.createElement("script");
-    api.src = "https://w.soundcloud.com/player/api.js";
-    api.onload = wireWidget;
-    document.head.appendChild(api);
+  function openHaizinaPanel() {
+    if (!haizinaPanel) return;
+    haizinaPanel.hidden = false;
+    haizinaPanel.classList.add("open");
+    score.setAttribute("aria-expanded", "true");
   }
 
-  score.addEventListener("click", function () {
-    if (scWidget) {
-      scWidget.isPaused(function (paused) {
-        if (paused) scWidget.play();
-        else scWidget.pause();
+  function closeHaizinaPanel() {
+    if (!haizinaPanel) return;
+    haizinaPanel.classList.remove("open");
+    score.setAttribute("aria-expanded", "false");
+    if (scWidget && scReady) scWidget.pause();
+    score.classList.remove("playing");
+    window.setTimeout(function () {
+      if (haizinaPanel && !haizinaPanel.classList.contains("open")) haizinaPanel.hidden = true;
+    }, 380);
+  }
+
+  function toggleHaizinaPlayback() {
+    openHaizinaPanel();
+    if (!scWidget) {
+      window.open(HAIZINA_PAGE, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (!scReady) {
+      scWidget.bind(SC.Widget.Events.READY, function () {
+        scReady = true;
+        scWidget.play();
       });
       return;
     }
-    window.open(HAIZINA_TRACK, "_blank", "noopener,noreferrer");
-  });
+    scWidget.isPaused(function (paused) {
+      if (paused) scWidget.play();
+      else scWidget.pause();
+    });
+  }
 
-  initHaizina();
+  function initHaizina() {
+    if (!haizinaIframe || !window.SC || !window.SC.Widget) return;
+    scWidget = SC.Widget(haizinaIframe);
+    scWidget.bind(SC.Widget.Events.READY, function () { scReady = true; });
+    scWidget.bind(SC.Widget.Events.PLAY, function () {
+      score.classList.add("playing");
+      openHaizinaPanel();
+    });
+    scWidget.bind(SC.Widget.Events.PAUSE, function () { score.classList.remove("playing"); });
+    scWidget.bind(SC.Widget.Events.FINISH, function () { score.classList.remove("playing"); });
+  }
+
+  score.addEventListener("click", toggleHaizinaPlayback);
+  if (haizinaClose) haizinaClose.addEventListener("click", closeHaizinaPanel);
+
+  if (window.SC && window.SC.Widget) initHaizina();
+  else {
+    var scApi = document.querySelector('script[src*="soundcloud.com/player/api"]');
+    if (scApi) scApi.addEventListener("load", initHaizina);
+  }
 
   var frames = 0, clockTimer = null;
   function startClock() {

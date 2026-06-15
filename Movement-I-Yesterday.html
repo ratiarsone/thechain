@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>The Chain · Movement I — Yesterday</title>
 <meta name="description" content="Movement I — Yesterday. The chain installed. A green-phosphor orbit of inherited memory, read inside TransmissionOS." />
-<link rel="stylesheet" href="chain.css?v=6" />
+<link rel="stylesheet" href="chain.css?v=8" />
 </head>
 <body data-channel="outer">
 
@@ -64,12 +64,29 @@
       <span class="tcode" id="masterTc">00:00:00:00</span>
     </div>
     <div class="brand">
-      <button class="haizina" id="score" aria-label="Play score Haizina">
+      <button class="haizina" id="score" aria-label="Play score Haizina" aria-controls="haizinaPanel" aria-expanded="false">
         <span class="pp"><svg class="ic-play" viewBox="0 0 10 10"><path d="M1 0 L9 5 L1 10Z"/></svg><svg class="ic-pause" viewBox="0 0 10 10"><rect x="1" y="0" width="3" height="10"/><rect x="6" y="0" width="3" height="10"/></svg></span>
         <span class="nm hide-sm">HAIZINA</span>
         <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
       </button>
     </div>
+  </div>
+
+  <div class="haizina-panel" id="haizinaPanel" aria-label="Haizina score player" hidden>
+    <div class="haizina-panel-head">
+      <span>HAIZINA · SCORE</span>
+      <button type="button" class="haizina-close" id="haizinaClose" aria-label="Close player">×</button>
+    </div>
+    <iframe
+      id="haizinaPlayer"
+      title="Haizina — drum bass piano by ParkDL"
+      width="100%"
+      height="120"
+      scrolling="no"
+      frameborder="no"
+      allow="autoplay"
+      src="https://w.soundcloud.com/player/?visual=false&amp;url=https%3A%2F%2Fapi.soundcloud.com%2Ftracks%2F2246396927&amp;secret_token=s-hPaOloeJk62&amp;auto_play=false&amp;hide_related=true&amp;show_comments=false&amp;show_user=false&amp;show_reposts=false&amp;show_teaser=false&amp;show_artwork=false&amp;color=%2346ff97"
+    ></iframe>
   </div>
 
   <!-- STAGE -->
@@ -157,7 +174,8 @@
   <div class="headswitch"></div>
 </div>
 
+<script src="https://w.soundcloud.com/player/api.js"></script>
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script src="chain.js?v=7"></script>
+<script src="chain.js?v=8"></script>
 </body>
 </html>
