@@ -344,32 +344,11 @@
   // ============================================================
   // SCORE + CLOCK + COLD OPEN
   // ============================================================
-  var haizinaPanel = document.getElementById("haizinaPanel");
-  var haizinaClose = document.getElementById("haizinaClose");
   var haizinaIframe = document.getElementById("haizinaPlayer");
   var scWidget = null;
   var scReady = false;
 
-  function openHaizinaPanel() {
-    if (!haizinaPanel) return;
-    haizinaPanel.hidden = false;
-    haizinaPanel.classList.add("open");
-    score.setAttribute("aria-expanded", "true");
-  }
-
-  function closeHaizinaPanel() {
-    if (!haizinaPanel) return;
-    haizinaPanel.classList.remove("open");
-    score.setAttribute("aria-expanded", "false");
-    if (scWidget && scReady) scWidget.pause();
-    score.classList.remove("playing");
-    window.setTimeout(function () {
-      if (haizinaPanel && !haizinaPanel.classList.contains("open")) haizinaPanel.hidden = true;
-    }, 380);
-  }
-
   function toggleHaizinaPlayback() {
-    openHaizinaPanel();
     if (!scWidget) {
       window.open(HAIZINA_PAGE, "_blank", "noopener,noreferrer");
       return;
@@ -391,16 +370,12 @@
     if (!haizinaIframe || !window.SC || !window.SC.Widget) return;
     scWidget = SC.Widget(haizinaIframe);
     scWidget.bind(SC.Widget.Events.READY, function () { scReady = true; });
-    scWidget.bind(SC.Widget.Events.PLAY, function () {
-      score.classList.add("playing");
-      openHaizinaPanel();
-    });
+    scWidget.bind(SC.Widget.Events.PLAY, function () { score.classList.add("playing"); });
     scWidget.bind(SC.Widget.Events.PAUSE, function () { score.classList.remove("playing"); });
     scWidget.bind(SC.Widget.Events.FINISH, function () { score.classList.remove("playing"); });
   }
 
   score.addEventListener("click", toggleHaizinaPlayback);
-  if (haizinaClose) haizinaClose.addEventListener("click", closeHaizinaPanel);
 
   if (window.SC && window.SC.Widget) initHaizina();
   else {
