@@ -489,6 +489,7 @@
   function onNode(id) {
     var f = byId[id];
     if (f.terminus && isTerminusLocked()) { denyTerminus(); return; }
+    playScoreOnGesture(scoreCueFor(id));
     select(id, true);
   }
 
@@ -523,7 +524,6 @@
     render(f);
     refreshNodes();
     if (state.opened) {
-      startScoreForMemory(id, true);
       syncMusicToClarity(getMemState(id).seen ? 1 : Math.max(0.45, getMemState(id).clarity), getMemState(id).seen);
     }
     developPointer = false;
@@ -698,7 +698,11 @@
     var i = arr.indexOf(state.active);
     var n = i + dir;
     while (n >= 0 && n < arr.length) {
-      if (!(byId[arr[n]].terminus && isTerminusLocked())) { select(arr[n], true); return; }
+      if (!(byId[arr[n]].terminus && isTerminusLocked())) {
+        playScoreOnGesture(scoreCueFor(arr[n]));
+        select(arr[n], true);
+        return;
+      }
       n += dir;
     }
   }
@@ -777,7 +781,7 @@
   }
 
   function ensureScorePlaying(vol) {
-    if (!scWidget || !scReady) {
+    if (!scWidget || !scReady || scLoadPending) {
       scoreAutoplayPending = true;
       return;
     }
@@ -785,30 +789,19 @@
     scWidget.play();
   }
 
-  function tryPlayScore() {
-    ensureScorePlaying(100);
-  }
-
-  function waitAndPlayScore() {
-    if (scWidget && scReady && !scLoadPending) {
-      tryPlayScore();
+  /** Call only from click / pointerdown / keydown handlers — sync play() in gesture context */
+  function playScoreOnGesture(i) {
+    unlockScoreGesture();
+    var t = SCORE_CUE[i];
+    if (!t) return;
+    cueIdx = i;
+    updateScoreLabel();
+    if (scWidget && scReady && !scLoadPending && loadedCueIdx === i) {
+      ensureScorePlaying(100);
       return;
     }
     scoreAutoplayPending = true;
-    var tries = 0;
-    var poll = setInterval(function () {
-      tries++;
-      if (scWidget && scReady && !scLoadPending) {
-        clearInterval(poll);
-        scoreAutoplayPending = false;
-        tryPlayScore();
-      } else if (tries > 80) clearInterval(poll);
-    }, 100);
-  }
-
-  function playScoreCueNow(i) {
     loadScoreCue(i, true);
-    waitAndPlayScore();
   }
 
   function loadScoreCue(i, autoplay) {
@@ -818,7 +811,7 @@
     cueIdx = i;
     updateScoreLabel();
     if (scWidget && scReady && !scLoadPending && loadedCueIdx === i) {
-      if (shouldPlay) waitAndPlayScore();
+      if (shouldPlay) ensureScorePlaying(100);
       return;
     }
     if (!scWidget) {
@@ -827,6 +820,7 @@
       if (scoreIframe) scoreIframe.src = scoreEmbedSrc(t, shouldPlay);
       return;
     }
+    if (scLoadPending) return;
     scoreAutoplayPending = shouldPlay;
     scReady = false;
     scLoadPending = true;
@@ -1298,16 +1292,18 @@
       pauseScore();
       return;
     }
-    if (fromGesture) unlockScoreGesture();
-    if (scoreGestureUnlocked || fromGesture) playScoreCueNow(scoreCueFor(id));
-    else loadScoreCue(scoreCueFor(id), false);
+    if (fromGesture) {
+      playScoreOnGesture(scoreCueFor(id));
+      return;
+    }
+    loadScoreCue(scoreCueFor(id), false);
   }
 
   function previewChar(id) {
     if (!CHARS[id] || csHover === id) return;
     csHover = id;
     paintFeatured(id);
-    playRosterScore(id);
+    loadScoreCue(scoreCueFor(id), false);
   }
 
   function rosterPreviewTarget(e) {
@@ -1370,13 +1366,12 @@
     csPick = id;
     csHover = null;
     paintFeatured(id);
-    if (scoreGestureUnlocked) playScoreCueNow(scoreCueFor(id));
-    else previewScoreForMemory(id);
+    playScoreOnGesture(scoreCueFor(id));
   }
 
   function enterWith(id) {
     if (charLocked(id)) return;
-    unlockScoreGesture();
+    playScoreOnGesture(scoreCueFor(id));
     charSelect.classList.add("gone");
     if (tv) tv.stop();
     state.opened = true;
