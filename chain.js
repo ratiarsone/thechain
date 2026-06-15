@@ -16,7 +16,8 @@
     { label: "HAIZINA", page: "https://soundcloud.com/parkdl/haizina-drum-bass-piano/s-hPaOloeJk62", api: "https://api.soundcloud.com/tracks/2246396927", secret: "s-hPaOloeJk62" },
     { label: "THE STAIRS", page: "https://soundcloud.com/parkdl/the-stairs-ruff-mix/s-6ZWiZALOuLX", api: "https://api.soundcloud.com/tracks/2282565227", secret: "s-6ZWiZALOuLX" },
     { label: "THE WEIGHT", page: "https://soundcloud.com/parkdl/the-weight-2-w-guits/s-4LV9f9lZ7rW", api: "https://api.soundcloud.com/tracks/2272915949", secret: "s-4LV9f9lZ7rW" },
-    { label: "FADY", page: "https://soundcloud.com/parkdl/fady-oohs-3/s-MDVt4YfqhS3", api: "https://api.soundcloud.com/tracks/2260182809", secret: "s-MDVt4YfqhS3" }
+    { label: "FADY", page: "https://soundcloud.com/parkdl/fady-oohs-3/s-MDVt4YfqhS3", api: "https://api.soundcloud.com/tracks/2260182809", secret: "s-MDVt4YfqhS3" },
+    { label: "IRERY AHO", page: "https://soundcloud.com/parkdl/irery-aho-live-drums-guit/s-mIXJYuegPeZ", api: "https://api.soundcloud.com/tracks/2247689000", secret: "s-mIXJYuegPeZ" }
   ];
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
