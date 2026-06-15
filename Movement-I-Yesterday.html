@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>The Chain · Movement I — Yesterday</title>
 <meta name="description" content="Movement I — Yesterday. The chain installed. A green-phosphor orbit of inherited memory, read inside TransmissionOS." />
-<link rel="stylesheet" href="chain.css?v=13" />
+<link rel="stylesheet" href="chain.css?v=14" />
 </head>
 <body data-channel="outer">
 
@@ -27,6 +27,16 @@
   </button>
 </header>
 
+<!-- Memory breadcrumb — visible inside a memory -->
+<nav class="mem-crumb" id="memCrumb" aria-label="Memory location" hidden>
+  <button type="button" class="mem-crumb-link" id="memCrumbHome">THE CHAIN</button>
+  <span class="mem-crumb-sep" aria-hidden="true">›</span>
+  <span class="mem-crumb-idx" id="memCrumbIdx">MEMORY 1</span>
+  <span class="mem-crumb-sep" aria-hidden="true">›</span>
+  <span class="mem-crumb-title" id="memCrumbTitle">THE FIRST FALL</span>
+  <button type="button" class="mem-crumb-back" id="memCrumbBack">↑ ROSTER</button>
+</nav>
+
 <!-- ============================================================
      CHARACTER SELECT (game roster)
      ============================================================ -->
@@ -36,7 +46,7 @@
       <div class="cs-title">CHOOSE WHO <b>HANDS IT DOWN</b></div>
       <div class="cs-sub">THE CHAIN &middot; MOVEMENT ONE &middot; YESTERDAY</div>
     </div>
-    <div class="cs-mv">PICK A CHARACTER<br><b>OPEN THEIR MEMORY</b></div>
+    <div class="cs-mv">CLICK A CHARACTER<br><b>TO ENTER THEIR MEMORY</b></div>
   </div>
   <div class="cs-main">
     <div class="featured" id="featured">
@@ -57,8 +67,7 @@
     </div>
   </div>
   <div class="cs-foot">
-    <div class="cs-hint">CLICK A CHARACTER &middot; <b>← →</b> TO BROWSE &middot; <b>ENTER</b> TO BEGIN</div>
-    <button class="cs-enter" id="csEnter">▶ OPEN THIS MEMORY</button>
+    <div class="cs-hint">CLICK ANY CHARACTER TO BEGIN &middot; <b>← →</b> TO PREVIEW</div>
   </div>
 </div>
 
@@ -172,6 +181,6 @@
 
 <script src="https://w.soundcloud.com/player/api.js"></script>
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script src="chain.js?v=20"></script>
+<script src="chain.js?v=21"></script>
 </body>
 </html>

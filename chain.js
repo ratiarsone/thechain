@@ -44,7 +44,7 @@
       roles: [{ t: "THE DOCTOR", lead: true }],
       outer: "Separation rehearsed until it feels like weather. What you reach for lives behind something clear and hard.",
       inner: { g: "THE SABOTEUR ARRIVES", line: "It hurts less if you decide you never wanted it.", seed: "the part that talks him out of reaching" } },
-    { id: "sudbury", recv: 5, cue: 5, backgroundImage: null, tc: "19:06", era: "childhood · the shelter", title: "THE CAGE THAT WAS ALSO THE SHELTER",
+    { id: "sudbury", recv: 5, cue: 5, backgroundImage: "/img/mvt1/DP144488.jpg", tc: "19:06", era: "childhood · the shelter", title: "THE CAGE THAT WAS ALSO THE SHELTER",
       line: "The only safe room had a lock on the inside and the outside both.",
       roles: [{ t: "THE CAGE" }],
       outer: "Smallness bought safety; safety required smallness. To be protected is to be contained, and to be contained is to be safe.",
@@ -105,8 +105,12 @@
   var fRole = document.getElementById("fRole");
   var fHands = document.getElementById("fHands");
   var fTags = document.getElementById("fTags");
-  var csEnter = document.getElementById("csEnter");
   var rosterBtn = document.getElementById("rosterBtn");
+  var memCrumb = document.getElementById("memCrumb");
+  var memCrumbHome = document.getElementById("memCrumbHome");
+  var memCrumbBack = document.getElementById("memCrumbBack");
+  var memCrumbIdx = document.getElementById("memCrumbIdx");
+  var memCrumbTitle = document.getElementById("memCrumbTitle");
   var masterTc = document.getElementById("masterTc");
   var score = document.getElementById("score");
   var brandHome = document.getElementById("brandHome");
@@ -318,15 +322,26 @@
     var active = memBgSlot === 0 ? memBgA : memBgB;
     var next = memBgSlot === 0 ? memBgB : memBgA;
     var cur = active.style.backgroundImage;
-    if (cur && cur.indexOf(src) !== -1) {
+    var enc = encodeURI(src);
+    if (cur && (cur.indexOf(src) !== -1 || cur.indexOf(enc) !== -1)) {
       memBg.classList.add("visible");
       return;
     }
-    next.style.backgroundImage = "url(\"" + src + "\")";
+    next.style.backgroundImage = "url(\"" + encodeURI(src) + "\")";
     active.classList.remove("is-active");
     next.classList.add("is-active");
     memBgSlot = 1 - memBgSlot;
     memBg.classList.add("visible");
+  }
+
+  function updateMemCrumb(f) {
+    if (!memCrumb) return;
+    var inMemory = state.opened && charSelect.classList.contains("gone");
+    document.body.classList.toggle("memory-open", inMemory);
+    memCrumb.hidden = !inMemory;
+    if (!inMemory || !f) return;
+    if (memCrumbIdx) memCrumbIdx.textContent = "MEMORY " + f.recv + " OF " + TOTAL;
+    if (memCrumbTitle) memCrumbTitle.textContent = f.title;
   }
 
   function render(f) {
@@ -353,6 +368,7 @@
       roSeed.classList.remove("idle");
     }
     updateMemoryBackground(f);
+    updateMemCrumb(f);
   }
 
   // ============================================================
@@ -614,7 +630,7 @@
         '<span class="cc-plate"><span class="cc-name">' + (locked ? "LOCKED" : c.name) + '</span></span>';
       card.addEventListener("click", function () {
         if (charLocked(id)) { highlightChar(id); return; }
-        if (csPick === id) { enterWith(id); } else { highlightChar(id); }
+        enterWith(id);
       });
       roster.appendChild(card);
     });
@@ -643,11 +659,6 @@
     fName.textContent = locked ? "LOCKED" : c.name;
     fHands.textContent = c.hands;
     fTags.innerHTML = (locked ? '<span class="ftag">LOCKED</span>' : '<span class="ftag">MEMORY ' + c.p + ' OF ' + TOTAL + '</span>');
-    var danger = (c.fac === "WORLD" || c.fac === "DARK");
-    csEnter.classList.toggle("world", danger);
-    csEnter.textContent = locked ? "\u25b6 LOCKED" : "\u25b6 OPEN THIS MEMORY";
-    csEnter.disabled = locked;
-    csEnter.style.opacity = locked ? "0.4" : "1";
     previewScoreForMemory(id);
   }
 
@@ -675,15 +686,17 @@
     if (!charSelect.classList.contains("gone")) return;
     state.opened = false;
     hideMemoryBackground();
+    updateMemCrumb(null);
     openRoster();
     save();
   }
 
   window.addEventListener("resize", function () { if (tv) tv.resize(); });
 
-  csEnter.addEventListener("click", function () { if (!charLocked(csPick)) enterWith(csPick); });
   rosterBtn.addEventListener("click", goHome);
   if (brandHome) brandHome.addEventListener("click", goHome);
+  if (memCrumbHome) memCrumbHome.addEventListener("click", goHome);
+  if (memCrumbBack) memCrumbBack.addEventListener("click", goHome);
   document.addEventListener("keydown", function (e) {
     if (charSelect.classList.contains("gone")) return;
     var i = RECEIVED.indexOf(csPick);
