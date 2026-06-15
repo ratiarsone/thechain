@@ -588,6 +588,7 @@ body[data-channel="inner"] .ro-decode b { color: var(--red-soft); }
 .fwatermark { position: absolute; right: 6%; bottom: -8%; font-family: var(--disp); font-weight: 700; font-size: clamp(8rem, 24vh, 18rem); line-height: 1; color: color-mix(in oklab, var(--fc) 14%, transparent); pointer-events: none; }
 .fportrait { position: absolute; inset: 0; z-index: 2; min-height: 200px; }
 .fportrait .relief-canvas {
+  opacity: 0.82;
   filter: drop-shadow(0 0 22px color-mix(in oklab, var(--fc) 45%, transparent));
 }
 body[data-channel="inner"] .fportrait .relief-canvas {
@@ -649,11 +650,12 @@ body[data-channel="inner"] .fportrait .relief-canvas {
 .char-card .cc-name { font-family: var(--disp); font-weight: 600; font-size: 0.74rem; line-height: 1; color: var(--grn-hi); letter-spacing: 0.02em; }
 .char-card .cc-role { font-family: var(--mono); font-size: 0.46rem; letter-spacing: 0.1em; color: var(--grn-dim); margin-top: 3px; text-transform: uppercase; }
 .char-card .cc-scan { position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0; background: linear-gradient(180deg, transparent, color-mix(in oklab, var(--fc) 12%, transparent)); transition: opacity 0.2s var(--ease); }
-.char-card:hover { transform: translateY(-3px); border-color: var(--fc); box-shadow: 0 0 10px color-mix(in oklab, var(--fc) 40%, transparent); }
-.char-card:hover .cc-portrait, .char-card.sel .cc-portrait { opacity: 1; }
-.char-card:hover .cc-photo, .char-card.sel .cc-photo { opacity: 0.92; filter: saturate(0.62) contrast(1.06) brightness(0.78); }
+.char-card:hover, .char-card.hover { transform: translateY(-3px); border-color: var(--fc); box-shadow: 0 0 10px color-mix(in oklab, var(--fc) 40%, transparent); }
 .char-card.sel { border-color: var(--grn-hi); box-shadow: 0 0 0 1px var(--fc), 0 0 16px color-mix(in oklab, var(--fc) 50%, transparent); }
-.char-card.sel .cc-scan { opacity: 1; }
+.char-card.hover.sel { box-shadow: 0 0 0 1px var(--grn-hi), 0 0 20px color-mix(in oklab, var(--fc) 55%, transparent); }
+.char-card.hover .cc-portrait, .char-card.sel .cc-portrait { opacity: 1; }
+.char-card.hover .cc-photo, .char-card.sel .cc-photo { opacity: 0.92; filter: saturate(0.62) contrast(1.06) brightness(0.78); }
+.char-card.hover .cc-scan, .char-card.sel .cc-scan { opacity: 1; }
 .char-card.locked { cursor: not-allowed; }
 .char-card.locked .cc-portrait .silh { fill: #123; }
 .char-card.locked .cc-name, .char-card.locked .cc-role { color: var(--grn-dim); }

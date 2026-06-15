@@ -97,6 +97,7 @@
   var coreSeed = document.getElementById("coreSeed");
   var charSelect = document.getElementById("charSelect");
   var roster = document.getElementById("roster");
+  var rosterWrap = document.getElementById("rosterWrap");
   var featured = document.getElementById("featured");
   var fWatermark = document.getElementById("fWatermark");
   var fPortrait = document.getElementById("fPortrait");
@@ -850,6 +851,7 @@
   // CHARACTER SELECT
   // ============================================================
   var csPick = RECEIVED[0];
+  var csHover = null;
 
   // ---- character relief (P1–P4 photos + depth-displaced hologram) ----
   var CHAR_PHOTOS = {
@@ -860,7 +862,8 @@
   };
   var RELIEF_SEG_W = 200;
   var RELIEF_SEG_H = 260;
-  var RELIEF_DISPLACEMENT = 0.35;
+  var RELIEF_DISPLACEMENT = 0.22;
+  var RELIEF_OPACITY = 0.52;
   var CHANNEL_TINT = { outer: 0x46ff97, inner: 0xff5546 };
 
   var tv = null;
@@ -906,7 +909,7 @@
         "void main(){",
         "  float scan = step(0.5, fract(vUv.y * 260.0 + uTime * 0.45));",
         "  float rim = pow(1.0 - abs(vNorm.z), 2.0);",
-        "  float a = scan * rim * uFlick * 0.48;",
+        "  float a = scan * rim * uFlick * 0.32;",
         "  vec3 col = uTint * a;",
         "  col.r += sin(uTime * 3.0) * 0.025;",
         "  col.b += cos(uTime * 2.6) * 0.025;",
@@ -929,7 +932,14 @@
       d[i] = d[i + 1] = d[i + 2] = lum;
     }
     ctx.putImageData(data, 0, 0);
-    var tex = new T.CanvasTexture(c);
+    // soften auto-depth so relief reads as face, not spikes
+    var blur = document.createElement("canvas");
+    blur.width = c.width;
+    blur.height = c.height;
+    var bctx = blur.getContext("2d");
+    bctx.filter = "blur(4px)";
+    bctx.drawImage(c, 0, 0);
+    var tex = new T.CanvasTexture(blur);
     if (T.NoColorSpace) tex.colorSpace = T.NoColorSpace;
     tex.needsUpdate = true;
     return tex;
@@ -971,6 +981,7 @@
     var running = false;
     var reduce = reduceMotion;
     var lastIcon = { model: "noble", col: 0x46ff97, lock: false };
+    var currentReliefId = null;
 
     function disposeObj(o) {
       if (!o) return;
@@ -1002,11 +1013,11 @@
 
     function addFig(geo, col, lock) {
       var solid = new T.Mesh(geo, new T.MeshPhongMaterial({
-        color: col, emissive: col, emissiveIntensity: lock ? 0.12 : 0.38,
-        transparent: true, opacity: lock ? 0.08 : 0.35, flatShading: true, shininess: 40, side: T.DoubleSide
+        color: col, emissive: col, emissiveIntensity: lock ? 0.1 : 0.28,
+        transparent: true, opacity: lock ? 0.06 : 0.22, flatShading: true, shininess: 40, side: T.DoubleSide
       }));
       var wire = new T.LineSegments(new T.WireframeGeometry(geo), new T.LineBasicMaterial({
-        color: col, transparent: true, opacity: lock ? 0.2 : 0.92
+        color: col, transparent: true, opacity: lock ? 0.16 : 0.58
       }));
       group.add(solid);
       group.add(wire);
@@ -1014,6 +1025,7 @@
 
     function setIconModel(model, col, lock) {
       clearGroup();
+      currentReliefId = null;
       lastIcon = { model: model, col: col, lock: lock };
       if (model === "cage") {
         var body = new T.BoxGeometry(1.5, 1.45, 1.2); body.translate(0, -0.42, 0); addFig(body, col, lock);
@@ -1046,10 +1058,14 @@
         map: colorTex,
         displacementMap: depthTex,
         displacementScale: planeH * RELIEF_DISPLACEMENT,
-        roughness: 0.52,
-        metalness: 0.06,
+        displacementBias: -planeH * RELIEF_DISPLACEMENT * 0.18,
+        transparent: true,
+        opacity: RELIEF_OPACITY,
+        depthWrite: false,
+        roughness: 0.68,
+        metalness: 0.04,
         emissive: tint,
-        emissiveIntensity: 0.08
+        emissiveIntensity: 0.14
       }));
       group.add(reliefMesh);
       holoMat = holoOverlayMaterial(T, tintHex);
@@ -1078,6 +1094,12 @@
         setIconModel(locked ? "orb" : c.model, tintHex, locked);
         return;
       }
+      if (reliefMesh && currentReliefId === charId) {
+        setChannelTint(state.channel === "inner" ? "inner" : "outer");
+        render();
+        return;
+      }
+      currentReliefId = charId;
       var gen = ++loadGen;
       clearGroup();
       render();
@@ -1100,6 +1122,7 @@
           depthTex = luminanceDepthFromImage(colorImg, T);
         }
         buildRelief(colorTex, depthTex, tintHex);
+        currentReliefId = charId;
       }).catch(function () {
         if (gen !== loadGen) return;
         setIconModel(c.model || "son", tintHex, false);
@@ -1186,6 +1209,53 @@
   function facClass(fac) { return fac === "PLACE" ? "fac-place" : (fac === "WORLD" || fac === "DARK") ? "fac-world" : ""; }
   function charLocked(id) { return !!CHARS[id].locked && isTerminusLocked(); }
 
+  function paintFeatured(id) {
+    var c = CHARS[id];
+    if (!c) return;
+    var locked = charLocked(id);
+    Array.prototype.forEach.call(roster.querySelectorAll(".char-card"), function (el) {
+      var cid = el.getAttribute("data-id");
+      el.classList.toggle("sel", cid === csPick);
+      el.classList.toggle("hover", !!csHover && cid === csHover);
+    });
+    featured.className = "featured " + facClass(c.fac);
+    fWatermark.textContent = c.p;
+    if (window.THREE) kickPortraitViewer(id, locked);
+    else {
+      fPortrait.className = "fportrait" + (locked ? " lockedfig" : "");
+      fPortrait.innerHTML = build3d(locked ? "dark" : kindOf(c));
+    }
+    fP1.textContent = "P" + c.p + " / " + TOTAL;
+    fName.textContent = locked ? "LOCKED" : c.name;
+    fHands.textContent = c.hands;
+    fTags.innerHTML = (locked ? '<span class="ftag">LOCKED</span>' : '<span class="ftag">MEMORY ' + c.p + ' OF ' + TOTAL + '</span>');
+  }
+
+  function previewChar(id) {
+    if (!CHARS[id] || csHover === id) return;
+    csHover = id;
+    paintFeatured(id);
+  }
+
+  function rosterPreviewTarget(e) {
+    if (!charSelect || charSelect.classList.contains("gone")) return null;
+    if (!roster || !roster.contains(e.target)) return null;
+    var card = e.target.closest(".char-card");
+    return card ? card.getAttribute("data-id") : null;
+  }
+
+  function onRosterPointerOver(e) {
+    var id = rosterPreviewTarget(e);
+    if (id) previewChar(id);
+  }
+
+  function onRosterPointerLeave(e) {
+    if (!csHover || !rosterWrap) return;
+    var next = e.relatedTarget;
+    if (next && rosterWrap.contains(next)) return;
+    clearRosterHover();
+  }
+
   function buildRoster() {
     roster.innerHTML = "";
     RECEIVED.forEach(function (id) {
@@ -1208,24 +1278,16 @@
     });
   }
 
+  function clearRosterHover() {
+    if (!csHover) return;
+    csHover = null;
+    paintFeatured(csPick);
+  }
+
   function highlightChar(id) {
     csPick = id;
-    var c = CHARS[id];
-    var locked = charLocked(id);
-    Array.prototype.forEach.call(roster.querySelectorAll(".char-card"), function (el) {
-      el.classList.toggle("sel", el.getAttribute("data-id") === id);
-    });
-    featured.className = "featured " + facClass(c.fac);
-    fWatermark.textContent = c.p;
-    if (window.THREE) kickPortraitViewer(id, locked);
-    else {
-      fPortrait.className = "fportrait" + (locked ? " lockedfig" : "");
-      fPortrait.innerHTML = build3d(locked ? "dark" : kindOf(c));
-    }
-    fP1.textContent = "P" + c.p + " / " + TOTAL;
-    fName.textContent = locked ? "LOCKED" : c.name;
-    fHands.textContent = c.hands;
-    fTags.innerHTML = (locked ? '<span class="ftag">LOCKED</span>' : '<span class="ftag">MEMORY ' + c.p + ' OF ' + TOTAL + '</span>');
+    csHover = null;
+    paintFeatured(id);
     previewScoreForMemory(id);
   }
 
@@ -1263,7 +1325,11 @@
     save();
   }
 
+  function featuredPick() { return csHover || csPick; }
+
   window.addEventListener("resize", function () { if (tv) tv.resize(); });
+  if (roster) roster.addEventListener("pointerover", onRosterPointerOver);
+  if (rosterWrap) rosterWrap.addEventListener("pointerleave", onRosterPointerLeave);
 
   rosterBtn.addEventListener("click", goHome);
   if (brandHome) brandHome.addEventListener("click", goHome);
@@ -1272,7 +1338,8 @@
   if (featured) {
     featured.addEventListener("click", function () {
       if (charSelect.classList.contains("gone")) return;
-      if (!charLocked(csPick)) enterWith(csPick);
+      var id = featuredPick();
+      if (!charLocked(id)) enterWith(id);
     });
   }
   document.addEventListener("keydown", function (e) {
@@ -1280,7 +1347,7 @@
     var i = RECEIVED.indexOf(csPick);
     if (e.key === "ArrowRight") { e.preventDefault(); highlightChar(RECEIVED[Math.min(RECEIVED.length - 1, i + 1)]); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); highlightChar(RECEIVED[Math.max(0, i - 1)]); }
-    else if (e.key === "Enter") { e.preventDefault(); if (!charLocked(csPick)) enterWith(csPick); }
+    else if (e.key === "Enter") { e.preventDefault(); var id = featuredPick(); if (!charLocked(id)) enterWith(id); }
   });
 
   // ============================================================
