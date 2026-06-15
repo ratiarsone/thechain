@@ -148,7 +148,7 @@
   var recognitionLineEl = document.getElementById("recognitionLine");
   var seenCountEl = document.getElementById("seenCount");
 
-  var RING_R = 178;
+  var RING_R = 356;
   var nodeEls = {};
   var memBgSlot = 0;
   var memBgReady = {};
@@ -169,6 +169,7 @@
     // remove existing
     Object.keys(nodeEls).forEach(function (k) { if (nodeEls[k] && nodeEls[k].parentNode) nodeEls[k].parentNode.removeChild(nodeEls[k]); });
     nodeEls = {};
+    ring.style.setProperty("--r", RING_R);
     FRAGS.forEach(function (f) {
       var node = document.createElement("div");
       node.className = "node" + (f.terminus ? " terminus" : "");
