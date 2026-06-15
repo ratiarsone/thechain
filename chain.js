@@ -1083,14 +1083,14 @@
       ]).then(function (res) {
         var colorImg = res[0];
         var depthImg = res[1];
-        var loader = new T.TextureLoader();
-        var colorTex = loader.load(photos.color);
+        var colorTex = new T.Texture(colorImg);
         if (T.SRGBColorSpace) colorTex.colorSpace = T.SRGBColorSpace;
         colorTex.needsUpdate = true;
         var depthTex;
         if (depthImg) {
-          depthTex = loader.load(photos.depth);
+          depthTex = new T.Texture(depthImg);
           if (T.NoColorSpace) depthTex.colorSpace = T.NoColorSpace;
+          depthTex.needsUpdate = true;
         } else {
           depthTex = luminanceDepthFromImage(colorImg, T);
         }
