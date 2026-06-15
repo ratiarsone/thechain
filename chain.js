@@ -24,32 +24,32 @@
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   var FRAGS = [
-    { id: "fall", recv: 1, tc: "00:00", era: "1971 · before the name", title: "THE FIRST FALL",
+    { id: "fall", recv: 1, cue: 1, tc: "00:00", era: "1971 · before the name", title: "THE FIRST FALL",
       line: "\u201cTonga le boay keliko.\u201d \u2014 the sentence that began the severance.",
       roles: [{ t: "THE NOBLE", lead: true }, { t: "THE DISOWNED" }],
       outer: "The line is cut before he even has a name. Something that was meant to keep flowing \u2014 hasina \u2014 goes quiet here first, and the long cut from the ancestors begins.",
       inner: { g: "NO ONE GUARDING YET", line: "A debt opened with no one yet alive to owe it.", seed: "a verdict, still looking for someone to land on", idle: true } },
-    { id: "blessing", recv: 2, tc: "04:12", era: "childhood · the blessing", title: "THE DOOR AGAINST THE WALL",
+    { id: "blessing", recv: 2, cue: 2, tc: "04:12", era: "childhood · the blessing", title: "THE DOOR AGAINST THE WALL",
       line: "A tso-drano laid like a hand on the head \u2014 and like a seal on a door.",
       roles: [{ t: "THE GRANDMOTHER", lead: true }],
       outer: "Protection and the cage arrive in one gesture. The first lesson: safety has walls.",
       inner: { g: "THE PROSECUTOR ARRIVES", line: "Watch yourself first, before anyone outside can.", seed: "the part of him that watches him first" } },
-    { id: "backseat", recv: 3, tc: "09:48", era: "childhood · the language", title: "TAUGHT BEFORE HE COULD SPELL IT",
+    { id: "backseat", recv: 3, cue: 3, tc: "09:48", era: "childhood · the language", title: "TAUGHT BEFORE HE COULD SPELL IT",
       line: "The caste vocabulary, passed back over the seat, in the voice of the people who love him.",
       roles: [{ t: "THE DOCTOR", lead: true }, { t: "THE SON", lead: true }],
       outer: "It comes in through care and language, before he can even read. It wears the face of love. What's hurting him is never them \u2014 it's what speaks through them: mpanandevo, fanompoana.",
       inner: { g: "THE PROSECUTOR, AT HIS POST", line: "Convict yourself first, and no one outside can.", seed: "the voice that agrees with them before they finish" } },
-    { id: "glass", recv: 4, tc: "14:30", era: "childhood · the separation", title: "THE MOTHER ON THE FAR SIDE",
+    { id: "glass", recv: 4, cue: 4, tc: "14:30", era: "childhood · the separation", title: "THE MOTHER ON THE FAR SIDE",
       line: "The airport glass \u2014 close enough to see, never close enough to hold.",
       roles: [{ t: "THE DOCTOR", lead: true }],
       outer: "Separation rehearsed until it feels like weather. What you reach for lives behind something clear and hard.",
       inner: { g: "THE SABOTEUR ARRIVES", line: "It hurts less if you decide you never wanted it.", seed: "the part that talks him out of reaching" } },
-    { id: "sudbury", recv: 5, tc: "19:06", era: "childhood · the shelter", title: "THE CAGE THAT WAS ALSO THE SHELTER",
+    { id: "sudbury", recv: 5, cue: 5, tc: "19:06", era: "childhood · the shelter", title: "THE CAGE THAT WAS ALSO THE SHELTER",
       line: "The only safe room had a lock on the inside and the outside both.",
       roles: [{ t: "THE CAGE" }],
       outer: "Smallness bought safety; safety required smallness. To be protected is to be contained, and to be contained is to be safe.",
       inner: { g: "THE PUNISHER ARRIVES", line: "Stay small and you stay safe; step out and you'll pay.", seed: "the part that makes trying hurt" } },
-    { id: "installed", recv: 6, tc: "31:00", era: "Haizina · the darkness, lowest", title: "IT RUNS ON ITS OWN NOW", terminus: true, locked: true,
+    { id: "installed", recv: 6, cue: 0, tc: "31:00", era: "Haizina · the darkness, lowest", title: "IT RUNS ON ITS OWN NOW", terminus: true, locked: true,
       line: "Not a new thing that happened \u2014 the weight of all the others, carried now without anyone choosing to.",
       roles: [{ t: "HAIZINA", lead: true }],
       outer: "By now it just runs, on its own. What was hurting him was never the people who loved him \u2014 it was what spoke through them: mpanandevo, fanompoana, Babylon. The way out isn't escape, and it isn't revenge. It's being seen \u2014 and that's Tomorrow.",
@@ -249,6 +249,7 @@
     witness(id);
     render(f);
     refreshNodes();
+    if (state.opened) startScoreForMemory(id, true);
     save();
   }
 
@@ -379,6 +380,20 @@
     }
     if (scoreAutoplayPending) return;
     scoreAutoplayPending = true;
+  }
+
+  function scoreCueFor(id) {
+    var f = byId[id];
+    return f && typeof f.cue === "number" ? f.cue : 0;
+  }
+
+  function startScoreForMemory(id, autoplay) {
+    loadScoreCue(scoreCueFor(id), autoplay !== false);
+  }
+
+  function previewScoreForMemory(id) {
+    if (state.opened) return;
+    loadScoreCue(scoreCueFor(id), false);
   }
 
   function loadScoreCue(i, autoplay) {
@@ -572,6 +587,7 @@
     csEnter.textContent = locked ? "\u25b6 LOCKED" : "\u25b6 OPEN THIS MEMORY";
     csEnter.disabled = locked;
     csEnter.style.opacity = locked ? "0.4" : "1";
+    previewScoreForMemory(id);
   }
 
   function enterWith(id) {
