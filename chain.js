@@ -24,7 +24,7 @@
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   var FRAGS = [
-    { id: "fall", recv: 1, cue: 1, backgroundImage: "/img/mvt1/Ranavalona_II,_photograph.png", tc: "00:00", era: "1971 · before the name", title: "THE FIRST FALL",
+    { id: "fall", recv: 1, cue: 1, backgroundImage: "/img/mvt1/fall-ranavalona.png", tc: "00:00", era: "1971 · before the name", title: "THE FIRST FALL",
       line: "\u201cTonga le boay keliko.\u201d \u2014 the sentence that began the severance.",
       roles: [{ t: "THE NOBLE", lead: true }, { t: "THE DISOWNED" }],
       outer: "The line is cut before he even has a name. Something that was meant to keep flowing \u2014 hasina \u2014 goes quiet here first, and the long cut from the ancestors begins.",
@@ -39,7 +39,7 @@
       roles: [{ t: "THE DOCTOR", lead: true }, { t: "THE SON", lead: true }],
       outer: "It comes in through care and language, before he can even read. It wears the face of love. What's hurting him is never them \u2014 it's what speaks through them: mpanandevo, fanompoana.",
       inner: { g: "THE PROSECUTOR, AT HIS POST", line: "Convict yourself first, and no one outside can.", seed: "the voice that agrees with them before they finish" } },
-    { id: "glass", recv: 4, cue: 4, backgroundImage: "/img/mvt1/The_Mother_on_the_Far_Side.jpg", tc: "14:30", era: "childhood · the separation", title: "THE MOTHER ON THE FAR SIDE",
+    { id: "glass", recv: 4, cue: 4, backgroundImage: "/img/mvt1/glass-mother.jpg", tc: "14:30", era: "childhood · the separation", title: "THE MOTHER ON THE FAR SIDE",
       line: "The airport glass \u2014 close enough to see, never close enough to hold.",
       roles: [{ t: "THE DOCTOR", lead: true }],
       outer: "Separation rehearsed until it feels like weather. What you reach for lives behind something clear and hard.",
@@ -300,6 +300,11 @@
     if (memBg) memBg.classList.remove("visible");
   }
 
+  function layerSrc(el) {
+    if (!el) return "";
+    return el.currentSrc || el.src || "";
+  }
+
   function updateMemoryBackground(f) {
     if (!memBg || !memBgA || !memBgB) return;
     if (!state.opened || !f || !f.backgroundImage) {
@@ -326,13 +331,13 @@
     }
     var active = memBgSlot === 0 ? memBgA : memBgB;
     var next = memBgSlot === 0 ? memBgB : memBgA;
-    var cur = active.style.backgroundImage;
-    var enc = bgSrc(src);
-    if (cur && (cur.indexOf(src) !== -1 || cur.indexOf(enc) !== -1)) {
+    var url = bgSrc(src);
+    var cur = layerSrc(active);
+    if (cur && (cur.indexOf(src) !== -1 || cur.indexOf(url) !== -1)) {
       memBg.classList.add("visible");
       return;
     }
-    next.style.backgroundImage = "url(\"" + bgSrc(src) + "\")";
+    next.src = url;
     active.classList.remove("is-active");
     next.classList.add("is-active");
     memBgSlot = 1 - memBgSlot;
