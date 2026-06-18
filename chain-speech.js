@@ -15,8 +15,10 @@
   function refreshVoices() {
     var s = synth();
     if (!s) return cachedVoices;
-    var list = s.getVoices();
-    if (list && list.length) cachedVoices = list;
+    try {
+      var list = s.getVoices();
+      if (list && list.length) cachedVoices = list;
+    } catch (e) {}
     return cachedVoices;
   }
 
@@ -110,14 +112,17 @@
       if (onDone) onDone(err || null);
     }
 
-    if (opts.replace !== false) {
-      activeText = "";
-      s.cancel();
+    try {
+      if (opts.replace !== false) {
+        activeText = "";
+        s.cancel();
+      }
+      s.resume();
+      var utt = buildUtterance(text, opts, finish);
+      s.speak(utt);
+    } catch (e) {
+      finish(e);
     }
-
-    s.resume();
-    var utt = buildUtterance(text, opts, finish);
-    s.speak(utt);
     return true;
   }
 
@@ -125,7 +130,7 @@
     var s = synth();
     if (!s) return;
     refreshVoices();
-    s.resume();
+    try { s.resume(); } catch (e) {}
     if (!cachedVoices.length) {
       global.setTimeout(refreshVoices, 250);
     }
@@ -135,12 +140,12 @@
     pending = null;
     activeText = "";
     var s = synth();
-    if (s) s.cancel();
+    if (s) { try { s.cancel(); } catch (e) {} }
   }
 
   function speaking() {
     var s = synth();
-    return !!(s && (s.speaking || s.pending));
+    try { return !!(s && (s.speaking || s.pending)); } catch (e) { return false; }
   }
 
   global.ChainSpeech = {

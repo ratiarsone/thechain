@@ -621,8 +621,9 @@
     var inh = fallInhabitant(ch);
     var line = inh.lines[i];
     if (!line) return;
-    stopFallLineAudio();
-    cancelFallSpeech();
+
+    // 1) Visuals first — the words and counter must appear no matter what
+    // happens with audio/speech below. Nothing here can throw.
     fallHoldIdx = i;
     fallHoldActive = true;
     hideTestimonyPrompt();
@@ -632,34 +633,38 @@
     if (inhabitantView) inhabitantView.setClarity(1);
     setHumTarget(0.01);
 
-    var waitMs = fallLineWaitMs(line);
-    var url = USE_FALL_MP3 && inh.voices && inh.voices[i];
-
-    function startTTS() {
-      primeSpeech();
-      if (window.ChainSpeech) {
-        window.ChainSpeech.speak(line, { side: ch, immediate: true, replace: true });
-      }
-    }
-
-    if (url) {
-      fallLineAudio = new Audio(url);
-      fallLineAudio.preload = "auto";
-      fallLineAudio.addEventListener("ended", function () { fallLineAudio = null; });
-      fallLineAudio.addEventListener("error", function () {
-        fallLineAudio = null;
-        startTTS();
-      });
-      fallLineAudio.play().then(function () {}).catch(function () {
-        fallLineAudio = null;
-        startTTS();
-      });
-    } else {
-      startTTS();
-    }
-
+    // 2) Timer drives the advance — guaranteed, independent of speech.
     clearFallHoldTimer();
-    fallHoldTimer = setTimeout(onFallLineDone, waitMs);
+    fallHoldTimer = setTimeout(onFallLineDone, fallLineWaitMs(line));
+
+    // 3) Audio / speech is best-effort and fully isolated. Deferred to a later
+    // tick and wrapped so a throw or hang can never break the line reveal.
+    var url = USE_FALL_MP3 && inh.voices && inh.voices[i];
+    setTimeout(function () {
+      try {
+        stopFallLineAudio();
+        cancelFallSpeech();
+      } catch (e) {}
+      function startTTS() {
+        try {
+          primeSpeech();
+          if (window.ChainSpeech) {
+            window.ChainSpeech.speak(line, { side: ch, immediate: true, replace: true });
+          }
+        } catch (e) {}
+      }
+      if (url) {
+        try {
+          fallLineAudio = new Audio(url);
+          fallLineAudio.preload = "auto";
+          fallLineAudio.addEventListener("ended", function () { fallLineAudio = null; });
+          fallLineAudio.addEventListener("error", function () { fallLineAudio = null; startTTS(); });
+          fallLineAudio.play().then(function () {}).catch(function () { fallLineAudio = null; startTTS(); });
+        } catch (e) { startTTS(); }
+      } else {
+        startTTS();
+      }
+    }, 0);
   }
 
   function onFallLineDone() {
