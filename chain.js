@@ -404,12 +404,17 @@
   function ensureInhabitantView() {
     if (!window.InhabitantRenderer || !inhabitantMount) return null;
     if (!inhabitantView) {
-      inhabitantMount.innerHTML = "";
-      inhabitantView = window.InhabitantRenderer.create(inhabitantMount, {
-        mode: window.InhabitantRenderer.RENDER_MODE,
-        reduceMotion: reduceMotion
-      });
-      if (inhabitantView) inhabitantView.start();
+      try {
+        inhabitantMount.innerHTML = "";
+        inhabitantView = window.InhabitantRenderer.create(inhabitantMount, {
+          mode: window.InhabitantRenderer.RENDER_MODE,
+          reduceMotion: reduceMotion
+        });
+        if (inhabitantView) inhabitantView.start();
+      } catch (e) {
+        // Face renderer failed (e.g. no WebGL). The testimony must still run.
+        inhabitantView = null;
+      }
     }
     return inhabitantView;
   }
@@ -1814,7 +1819,13 @@
     var T = window.THREE;
     var w = Math.max(container.clientWidth, 280);
     var h = Math.max(container.clientHeight, 320);
-    var renderer = new T.WebGLRenderer({ alpha: true, antialias: true });
+    var renderer;
+    try {
+      renderer = new T.WebGLRenderer({ alpha: true, antialias: true });
+    } catch (e) {
+      return null;
+    }
+    if (!renderer) return null;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(w, h);
     renderer.setClearAlpha(0);

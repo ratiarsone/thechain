@@ -156,7 +156,16 @@
 
     var w = Math.max(container.clientWidth, 280);
     var h = Math.max(container.clientHeight, 280);
-    var renderer = new T.WebGLRenderer({ alpha: true, antialias: true });
+    var renderer;
+    try {
+      renderer = new T.WebGLRenderer({ alpha: true, antialias: true });
+    } catch (e) {
+      // WebGL unavailable (hardware accel off, GPU blocklist, or context
+      // exhaustion). Return null so the caller still shows the testimony text;
+      // the face is optional, the words are not.
+      return null;
+    }
+    if (!renderer) return null;
     renderer.setPixelRatio(Math.min(global.devicePixelRatio || 1, 2));
     renderer.setSize(w, h);
     renderer.setClearColor(0x000000, 0);
