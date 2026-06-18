@@ -277,6 +277,212 @@ body[data-channel="inner"] .mem-bg-scrim {
     rgba(0, 0, 0, calc(0.12 - var(--clarity) * 0.06));
 }
 
+/* TUNE IN gate */
+.tune-gate {
+  position: fixed; inset: 0; z-index: 200;
+  background: #000; display: grid; place-items: center;
+  opacity: 1; transition: opacity 0.85s var(--ease);
+}
+.tune-gate[hidden] { display: none !important; }
+.tune-gate.is-off { opacity: 0; pointer-events: none; }
+.tune-gate-btn {
+  font-family: var(--disp); font-weight: 700;
+  font-size: clamp(2.4rem, 11vw, 6.5rem); line-height: 0.92;
+  letter-spacing: 0.1em; color: var(--grn-hi);
+  background: none; border: 0; padding: 0.2em 0.35em; cursor: pointer;
+  text-shadow: -2px 0 0 var(--mag), 2px 0 0 var(--cyan), var(--glow-strong);
+  transition: opacity 0.35s var(--ease), transform 0.35s var(--ease);
+}
+.tune-gate-btn:hover { transform: scale(1.02); opacity: 0.92; }
+
+/* inhabitant + possession — Memory 1 */
+.inhabitant-mount {
+  position: absolute; inset: 0; z-index: 8; pointer-events: none;
+  opacity: 0; transition: opacity 0.55s var(--ease);
+  background: radial-gradient(ellipse 92% 82% at 50% 40%, #030504 0%, #000 74%);
+}
+.inhabitant-mount.is-on { opacity: 1; }
+.inhabitant-mount canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+}
+
+.chain-strip {
+  position: fixed; left: 10px;
+  top: calc(var(--bar-h) + var(--crumb-h) + 12px);
+  bottom: calc(var(--foot-h) + 12px); z-index: 30;
+  display: flex; flex-direction: column; justify-content: space-between;
+  width: 11px; pointer-events: none;
+}
+.chain-strip-tick {
+  flex: 0 0 16px; width: 11px; background: var(--grn-faint);
+  transition: background 0.35s var(--ease), box-shadow 0.35s;
+}
+.chain-strip-tick.lit { background: var(--grn); box-shadow: var(--glow); }
+.chain-strip-tick.active { box-shadow: 0 0 0 1px var(--grn-hi); }
+body[data-channel="inner"] .chain-strip-tick.active { box-shadow: 0 0 0 1px var(--red); }
+
+/* Testimony stack — line + small counter over the face */
+body.memory-possession .testimony-layer {
+  z-index: 26;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 clamp(16px, 5vw, 48px) clamp(22vh, 28vh, 34vh);
+  inset: 0;
+  pointer-events: none;
+}
+body.memory-possession .testimony-prompt {
+  font-family: var(--disp);
+  font-weight: 600;
+  font-size: clamp(1rem, 2.8vw, 1.45rem);
+  letter-spacing: 0.2em;
+  text-align: center;
+  margin: 0;
+  opacity: 0.92;
+  animation: prompt-pulse 2.4s ease-in-out infinite;
+  text-shadow: 0 0 24px #000, var(--glow);
+}
+body.memory-possession[data-inhabitant="noble"] .testimony-prompt { color: var(--grn-hi); }
+body.memory-possession[data-inhabitant="disowned"] .testimony-prompt { color: var(--red-soft); }
+body.memory-possession .testimony-prompt[hidden] { display: none !important; }
+@keyframes prompt-pulse {
+  0%, 100% { opacity: 0.72; }
+  50% { opacity: 1; }
+}
+
+body.memory-possession .testimony-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(8px, 1.4vh, 14px);
+  width: min(92vw, 640px);
+  text-align: center;
+}
+body.memory-possession .testimony-caption {
+  margin-top: 0;
+  max-width: min(92vw, 22ch);
+  font-size: clamp(1.15rem, 3.4vw, 2rem);
+  line-height: 1.45;
+  opacity: 1;
+  filter: none;
+}
+body.memory-possession .testimony-caption.is-visible {
+  opacity: 1;
+  transform: none;
+}
+body.memory-possession .testimony-counter {
+  font-family: var(--mono);
+  font-size: clamp(0.68rem, 1.6vw, 0.88rem);
+  letter-spacing: 0.18em;
+  opacity: 0.75;
+}
+body.memory-possession[data-inhabitant="noble"] .testimony-counter { color: var(--grn-dim); }
+body.memory-possession[data-inhabitant="disowned"] .testimony-counter { color: var(--red-soft); }
+
+body[data-inhabitant="noble"] .testimony-caption,
+body[data-inhabitant="disowned"] .testimony-caption {
+  font-family: var(--mono); font-weight: 400;
+  font-size: clamp(1.15rem, 3.4vw, 2rem); line-height: 1.45;
+  letter-spacing: 0.03em; text-transform: none;
+  max-width: 22ch;
+}
+body[data-inhabitant="noble"] .testimony-caption {
+  color: var(--grn-hi);
+  text-shadow: 0 0 20px rgba(70,255,151,0.15), 0 4px 28px #000;
+}
+body[data-inhabitant="disowned"] .testimony-caption {
+  color: #ffd4cc;
+  text-shadow: 0 0 24px rgba(255,85,70,0.2), 0 4px 28px #000;
+}
+body[data-inhabitant="noble"] .inhabitant-mount {
+  background: radial-gradient(ellipse 88% 78% at 50% 42%, #041208 0%, #000 76%);
+}
+body[data-inhabitant="disowned"] .inhabitant-mount {
+  background: radial-gradient(ellipse 70% 62% at 50% 55%, #120608 0%, #000 82%);
+}
+
+.testimony-layer {
+  position: absolute; inset: 0; z-index: 12; pointer-events: none;
+}
+.testimony-line {
+  margin: 0;
+  text-align: center;
+  transition: opacity 0.35s var(--ease);
+}
+.testimony-line.is-visible { opacity: 1; }
+
+body.memory-possession .titlecard .tc-title {
+  font-size: clamp(1.6rem, 5.5vw, 3.2rem);
+}
+body[data-inhabitant="disowned"] .titlecard .tc-title {
+  font-family: var(--disp); font-weight: 700;
+  font-size: clamp(1.6rem, 5.5vw, 3.2rem); letter-spacing: 0.02em;
+  color: var(--red-soft);
+}
+body[data-inhabitant="noble"] .titlecard .tc-title {
+  font-size: clamp(1.6rem, 5.5vw, 3.2rem);
+}
+
+.develop-turn {
+  position: absolute; bottom: clamp(6%, 10vh, 12%); left: 50%; transform: translateX(-50%);
+  font-family: var(--disp); font-weight: 600;
+  font-size: clamp(1.15rem, 3.8vw, 2rem); letter-spacing: 0.12em; color: var(--amber);
+  text-shadow: 0 0 24px rgba(0,0,0,0.9), -1px 0 0 var(--mag), 1px 0 0 var(--cyan);
+  pointer-events: none; max-width: 92vw; text-align: center;
+}
+.develop-turn[hidden] { display: none !important; }
+
+body.memory-possession .orbit { display: none !important; }
+body.memory-possession .mem-bg { display: none; }
+body.memory-possession .readout { display: none; }
+body.memory-possession .lower .recursion { opacity: 0.3; }
+body.memory-possession .inhabitant-mount { z-index: 10; }
+body.memory-possession .develop-zone { z-index: 42; pointer-events: auto; }
+body.memory-possession .lower { z-index: 30; pointer-events: none; }
+body.memory-possession .develop-zone:not([hidden]) {
+  display: block !important;
+  pointer-events: auto;
+}
+body.memory-possession .develop-hint {
+  bottom: calc(var(--foot-h, 72px) + 108px);
+  display: block !important;
+  opacity: 0.95 !important;
+  color: var(--grn-hi);
+  font-size: clamp(0.95rem, 2.4vw, 1.25rem);
+  letter-spacing: 0.2em;
+  text-shadow: 0 0 24px #000, var(--glow);
+  z-index: 43;
+}
+body.memory-possession[data-inhabitant="disowned"] .develop-hint { color: var(--red-soft); }
+body.memory-possession .stage.developing .develop-hint { opacity: 0.65 !important; }
+body.memory-possession .develop-hint[hidden] { display: none !important; }
+
+body.memory-possession .seg.chan button.outer,
+body.memory-possession .seg.chan button.inner {
+  font-family: var(--mono);
+  letter-spacing: 0.16em;
+  min-width: 7.5rem;
+}
+
+.develop-zone[hidden] { display: none !important; }
+
+body.memory-possession.recognition-moment .inhabitant-mount {
+  filter: contrast(1.15) saturate(1.1);
+}
+body.memory-possession.recognition-moment::after {
+  content: ""; position: fixed; inset: 0; z-index: 50; pointer-events: none;
+  background: radial-gradient(ellipse 78% 58% at 50% 42%,
+    rgba(255,255,255,0.1), rgba(255,85,70,0.14) 42%, transparent 72%);
+  animation: rec-pulse 2.6s ease 1 forwards;
+}
+@keyframes rec-pulse {
+  0% { opacity: 0; }
+  18% { opacity: 1; }
+  72% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 /* develop — press and hold to see */
 .develop-zone {
   position: absolute; inset: 0; z-index: 8; cursor: crosshair;
@@ -286,15 +492,18 @@ body.memory-open .develop-zone { pointer-events: auto; }
 body.memory-open .stage.mem-seen .develop-zone { pointer-events: none; cursor: default; }
 .develop-hint, .develop-persp {
   position: absolute; bottom: 18%; left: 50%; transform: translateX(-50%);
-  font-size: 0.58rem; letter-spacing: 0.22em; color: var(--grn-dim);
+  font-family: var(--disp); font-weight: 600;
+  font-size: clamp(1.2rem, 4vw, 2.1rem); letter-spacing: 0.14em; color: var(--grn-dim);
   pointer-events: none; opacity: calc(0.55 - var(--clarity) * 0.45);
   transition: opacity 0.3s var(--ease);
-  text-shadow: 0 0 12px rgba(0,0,0,0.8);
+  text-shadow: 0 0 18px rgba(0,0,0,0.9), -1px 0 0 var(--mag), 1px 0 0 var(--cyan);
+  max-width: 92vw; text-align: center; line-height: 1.15;
 }
 .stage.developing .develop-hint { opacity: 0.15; }
 .stage.mem-seen .develop-hint, .stage.mem-seen .develop-persp { display: none; }
 .develop-persp {
-  bottom: 22%; color: var(--amber); opacity: 0.75; font-size: 0.54rem;
+  bottom: 22%; color: var(--amber); opacity: 0.75;
+  font-size: clamp(1.1rem, 3.5vw, 1.85rem);
 }
 .develop-persp[hidden] { display: none !important; }
 .stage.clarity-waiting .develop-persp { display: block; }
@@ -310,12 +519,22 @@ body.memory-open .stage.mem-seen .develop-zone { pointer-events: none; cursor: d
 }
 .recognition-flash[hidden] { display: none !important; }
 .recognition-flash .rec-tag {
-  display: block; font-size: 0.56rem; letter-spacing: 0.28em; color: var(--grn-hi);
+  display: block; font-size: clamp(0.72rem, 2vw, 0.95rem); letter-spacing: 0.28em; color: var(--grn-hi);
   margin-bottom: 0.65rem; text-shadow: var(--glow);
 }
 .recognition-flash .rec-line {
-  font-family: var(--mono); text-transform: none; font-size: clamp(0.82rem, 1.6vw, 1rem);
-  line-height: 1.55; color: var(--grn-soft); margin: 0;
+  font-family: var(--disp); font-weight: 500; text-transform: none;
+  font-size: clamp(1.2rem, 3.8vw, 2rem); line-height: 1.25; color: var(--grn-hi); margin: 0;
+  text-shadow: -1px 0 0 var(--mag), 1px 0 0 var(--cyan), 0 4px 24px #000;
+}
+body.memory-possession .titlecard .tc-line {
+  font-size: clamp(0.95rem, 2.4vw, 1.25rem); line-height: 1.4;
+}
+body[data-inhabitant="disowned"] .titlecard .tc-line {
+  font-size: clamp(0.82rem, 2vw, 1.05rem); color: #ffc4b8; opacity: 0.85;
+}
+body.memory-possession .titlecard .tc-meta {
+  font-size: clamp(0.72rem, 1.8vw, 0.95rem);
 }
 @media (prefers-reduced-motion: no-preference) {
   .recognition-flash.is-on { animation: recflash 3.2s var(--ease) 1 forwards; }

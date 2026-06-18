@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>The Chain · Movement I — Yesterday</title>
 <meta name="description" content="Movement I — Yesterday. The chain installed. A green-phosphor orbit of inherited memory, read inside TransmissionOS." />
-<link rel="stylesheet" href="chain.css?v=26" />
+<link rel="stylesheet" href="chain.css?v=40" />
 </head>
 <body data-channel="outer">
 
@@ -76,6 +76,10 @@
      ============================================================ -->
 <div class="crt" id="crt">
 
+  <div class="tune-gate" id="tuneGate" hidden aria-hidden="true">
+    <button type="button" class="tune-gate-btn" id="tuneGateBtn">TUNE IN</button>
+  </div>
+
   <!-- Hidden SoundCloud player — score cue -->
   <div class="haizina-audio" aria-hidden="true">
     <iframe
@@ -96,14 +100,31 @@
       <div class="mem-bg-grain" id="memBgGrain" aria-hidden="true"></div>
       <div class="mem-bg-scrim"></div>
     </div>
+    <div class="inhabitant-mount" id="inhabitantMount" hidden aria-hidden="true"></div>
+    <div class="testimony-layer" id="testimonyLayer" hidden aria-live="polite">
+      <div class="testimony-stack">
+        <p class="testimony-prompt" id="testimonyPrompt">PRESS · HOLD TO REVEAL</p>
+        <p class="testimony-line testimony-caption" id="testimonyLine"></p>
+        <span class="testimony-counter" id="possessionLineN" aria-hidden="true"></span>
+      </div>
+    </div>
     <div class="develop-zone" id="developZone" hidden aria-hidden="true">
-      <p class="develop-hint" id="developHint">HOLD TO SEE · SPACE OR PRESS</p>
-      <p class="develop-persp" id="developPersp" hidden>SWITCH PERSPECTIVE TO RECOGNIZE</p>
+      <p class="develop-hint" id="developHint">PRESS · HOLD TO REVEAL</p>
+      <p class="develop-persp" id="developPersp" hidden></p>
+      <p class="develop-turn" id="developTurn" hidden>PRESS C · HEAR THE OTHER SIDE</p>
     </div>
     <div class="recognition-flash" id="recognitionFlash" hidden aria-live="polite">
       <span class="rec-tag">RECOGNITION</span>
       <p class="rec-line" id="recognitionLine"></p>
     </div>
+    <nav class="chain-strip" id="chainStrip" hidden aria-label="Memory chain">
+      <span class="chain-strip-tick" data-id="fall"></span>
+      <span class="chain-strip-tick" data-id="blessing"></span>
+      <span class="chain-strip-tick" data-id="backseat"></span>
+      <span class="chain-strip-tick" data-id="glass"></span>
+      <span class="chain-strip-tick" data-id="sudbury"></span>
+      <span class="chain-strip-tick" data-id="installed"></span>
+    </nav>
     <div class="orbit" id="orbit">
       <div class="ring-wrap">
         <div class="ring idle" id="ring" style="--r:356;">
@@ -191,6 +212,9 @@
 
 <script src="https://w.soundcloud.com/player/api.js"></script>
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script src="chain.js?v=35"></script>
+<script src="chain-speech.js?v=2"></script>
+<script src="inhabitant-renderer.js?v=4"></script>
+<script src="voice-possession.js?v=9"></script>
+<script src="chain.js?v=53"></script>
 </body>
 </html>

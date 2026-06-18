@@ -23,6 +23,63 @@
   ];
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  if (window.InhabitantRenderer) window.InhabitantRenderer.RENDER_MODE = "signal";
+
+  var FALL_SLICE = {
+    recognition: "Neither of them did this. The code did, through both of them. mpanandevo. fanompoana. It was never them.",
+    recognitionAudio: "/audio/mvt1/recognition.mp3",
+    hum: "/audio/mvt1/room-hum.mp3",
+    inhabitants: {
+      outer: {
+        key: "noble",
+        channelLabel: "THE NOBLE",
+        rankLabel: "THE ELDER · KEEPS THE LINE",
+        presence: { scale: 1, y: 0.08 },
+        lines: [
+          "You are keeping the line clean.",
+          "This is not cruelty. It is duty.",
+          "He thinks you are breaking it. You are holding it together.",
+          "The law was here before you."
+        ],
+        voices: [
+          "/audio/mvt1/noble-1.mp3",
+          "/audio/mvt1/noble-2.mp3",
+          "/audio/mvt1/noble-3.mp3",
+          "/audio/mvt1/noble-4.mp3"
+        ],
+        photo: "/img/mvt1/noble.jpg",
+        depth: "/img/mvt1/noble-depth.jpg",
+        fallbacks: ["/img/mvt1/characters/noble.png"],
+        tint: 0x46ff97
+      },
+      inner: {
+        key: "disowned",
+        channelLabel: "THE DISOWNED",
+        rankLabel: "THE CHILD · BEFORE THE NAME",
+        presence: { scale: 0.72, y: -0.28 },
+        lines: [
+          "You brought your son home.",
+          "You said his name. Tonga le boay keliko.",
+          "The door did not open.",
+          "What broke you was not a stranger. It was your father, loving you through a law."
+        ],
+        voices: [
+          "/audio/mvt1/disowned-1.mp3",
+          "/audio/mvt1/disowned-2.mp3",
+          "/audio/mvt1/disowned-3.mp3",
+          "/audio/mvt1/disowned-4.mp3"
+        ],
+        photo: "/img/mvt1/disowned.jpg",
+        depth: "/img/mvt1/disowned-depth.jpg",
+        fallbacks: ["/img/mvt1/characters/son.jpg", "/img/mvt1/characters/noble.png"],
+        tint: 0xff5546,
+        tintFilter: "sepia(0.3) saturate(1.35) hue-rotate(-16deg) brightness(0.8)"
+      }
+    }
+  };
+  var DEFAULT_CH_OUTER = "THE WORLD";
+  var DEFAULT_CH_INNER = "INSIDE HIM";
+
   var FRAGS = [
     { id: "fall", recv: 1, cue: 1, backgroundImage: "/img/mvt1/fall-ranavalona.png", tc: "00:00", era: "1971 · before the name", title: "THE FIRST FALL",
       line: "\u201cTonga le boay keliko.\u201d \u2014 the sentence that began the severance.",
@@ -147,6 +204,32 @@
   var recognitionFlash = document.getElementById("recognitionFlash");
   var recognitionLineEl = document.getElementById("recognitionLine");
   var seenCountEl = document.getElementById("seenCount");
+  var inhabitantMount = document.getElementById("inhabitantMount");
+  var testimonyLayer = document.getElementById("testimonyLayer");
+  var testimonyLine = document.getElementById("testimonyLine");
+  var testimonyPrompt = document.getElementById("testimonyPrompt");
+  var possessionLineN = document.getElementById("possessionLineN");
+  var chainStrip = document.getElementById("chainStrip");
+  var tuneGate = document.getElementById("tuneGate");
+  var tuneGateBtn = document.getElementById("tuneGateBtn");
+  var developTurn = document.getElementById("developTurn");
+  var inhabitantView = null;
+  var possession = null;
+  var roomHum = null;
+  var roomHumVol = 0;
+  var synthHumCtx = null;
+  var synthHumGain = null;
+  var synthHumSrc = null;
+  var fallStemRAF = null;
+  var audioUnlocked = false;
+  var pendingFallEntry = false;
+  var currentCaption = "";
+  var FALL_LINE_MS = 2600;
+  var SCORE_VOL_SCALE = 0.7; // song sits ~30% under the spoken testimony lines
+  var fallHoldIdx = 0;
+  var fallHoldActive = false;
+  var fallHoldTuned = [false, false, false, false];
+  var fallHoldTimer = null;
 
   var RING_R = 356;
   var nodeEls = {};
@@ -242,7 +325,480 @@
   }
 
   function recognitionLineFor(f) {
+    if (f.id === "fall") return FALL_SLICE.recognition;
     return f.outer || "";
+  }
+
+  function defaultFallSides() {
+    return {
+      outer: { seen: false },
+      inner: { seen: false }
+    };
+  }
+
+  function fallInhabPayload(ch) {
+    var inh = FALL_SLICE.inhabitants[ch === "inner" ? "inner" : "outer"];
+    return {
+      channelLabel: inh.channelLabel,
+      rankLabel: inh.rankLabel || "",
+      key: inh.key,
+      lines: inh.lines,
+      voices: inh.voices,
+      photo: inh.photo,
+      depth: inh.depth,
+      fallbacks: inh.fallbacks || [],
+      tintHex: inh.tint,
+      tintFilter: inh.tintFilter || null,
+      presence: inh.presence || { scale: 1, y: 0 }
+    };
+  }
+
+  function syncInhabitantChrome(ch) {
+    var inh = FALL_SLICE.inhabitants[ch === "inner" ? "inner" : "outer"];
+    document.body.setAttribute("data-inhabitant", inh.key || (ch === "inner" ? "disowned" : "noble"));
+  }
+
+  function getFallSides() {
+    if (!state.fallSides) state.fallSides = defaultFallSides();
+    return state.fallSides;
+  }
+
+  function isPossessionMode() {
+    return state.opened && state.active === "fall" && charSelect.classList.contains("gone");
+  }
+
+  function fallInhabitant(ch) {
+    return FALL_SLICE.inhabitants[ch === "inner" ? "inner" : "outer"];
+  }
+
+  function syncPossessionUI() {
+    if (!chOuter || !chInner) return;
+    if (!isPossessionMode()) {
+      chOuter.textContent = DEFAULT_CH_OUTER;
+      chInner.textContent = DEFAULT_CH_INNER;
+      document.body.classList.remove("memory-possession", "recognition-moment");
+      if (chainStrip) chainStrip.hidden = true;
+      return;
+    }
+    document.body.classList.add("memory-possession");
+    chOuter.textContent = FALL_SLICE.inhabitants.outer.channelLabel;
+    chInner.textContent = FALL_SLICE.inhabitants.inner.channelLabel;
+    if (chainStrip) {
+      chainStrip.hidden = false;
+      syncChainStrip();
+    }
+  }
+
+  function syncChainStrip() {
+    if (!chainStrip) return;
+    var ticks = chainStrip.querySelectorAll(".chain-strip-tick");
+    Array.prototype.forEach.call(ticks, function (el) {
+      var id = el.getAttribute("data-id");
+      el.classList.toggle("lit", getMemState(id).seen || state.witnessed.indexOf(id) !== -1);
+      el.classList.toggle("active", id === state.active);
+    });
+  }
+
+  function ensureInhabitantView() {
+    if (!window.InhabitantRenderer || !inhabitantMount) return null;
+    if (!inhabitantView) {
+      inhabitantMount.innerHTML = "";
+      inhabitantView = window.InhabitantRenderer.create(inhabitantMount, {
+        mode: window.InhabitantRenderer.RENDER_MODE,
+        reduceMotion: reduceMotion
+      });
+      if (inhabitantView) inhabitantView.start();
+    }
+    return inhabitantView;
+  }
+
+  function ensureSynthHum() {
+    if (synthHumCtx) return synthHumCtx;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    synthHumCtx = new AC();
+    var bufferSize = 2 * synthHumCtx.sampleRate;
+    var noiseBuffer = synthHumCtx.createBuffer(1, bufferSize, synthHumCtx.sampleRate);
+    var output = noiseBuffer.getChannelData(0);
+    var last = 0;
+    for (var i = 0; i < bufferSize; i++) {
+      var white = Math.random() * 2 - 1;
+      last = (last + 0.02 * white) / 1.02;
+      output[i] = last * 3.5;
+    }
+    synthHumSrc = synthHumCtx.createBufferSource();
+    synthHumSrc.buffer = noiseBuffer;
+    synthHumSrc.loop = true;
+    var filter = synthHumCtx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 180;
+    synthHumGain = synthHumCtx.createGain();
+    synthHumGain.gain.value = 0;
+    synthHumSrc.connect(filter);
+    filter.connect(synthHumGain);
+    synthHumGain.connect(synthHumCtx.destination);
+    synthHumSrc.start(0);
+    return synthHumCtx;
+  }
+
+  function ensureRoomHum() {
+    if (roomHum) return roomHum;
+    if (!FALL_SLICE.hum) return null;
+    roomHum = new Audio();
+    roomHum.loop = true;
+    roomHum.preload = "auto";
+    roomHum.volume = 0;
+    roomHum.addEventListener("error", function () {
+      roomHum = null;
+      ensureSynthHum();
+    });
+    roomHum.src = FALL_SLICE.hum;
+    roomHum.play().catch(function () { ensureSynthHum(); });
+    return roomHum;
+  }
+
+  function setHumTarget(vol) {
+    roomHumVol = vol;
+    ensureRoomHum();
+    ensureSynthHum();
+    if (synthHumCtx && synthHumGain) {
+      if (synthHumCtx.state === "suspended") synthHumCtx.resume();
+    }
+    kickFallAudio();
+  }
+
+  function tickFallAudio() {
+    var any = false;
+    var hum = roomHum;
+    if (hum) {
+      var hc = hum.volume;
+      var hn = hc + (roomHumVol - hc) * 0.08;
+      if (Math.abs(hn - roomHumVol) < 0.006) hn = roomHumVol;
+      else any = true;
+      hum.volume = Math.max(0, Math.min(0.35, hn));
+      if (roomHumVol > 0.02 && hum.paused) hum.play().catch(function () { ensureSynthHum(); });
+      if (roomHumVol <= 0.01 && hn <= 0.006) { hum.pause(); hum.currentTime = 0; }
+    }
+    if (synthHumGain) {
+      var scoreOn = score && score.classList.contains("playing");
+      var tgt = Math.max(0, Math.min(scoreOn ? 0.045 : 0.09, roomHumVol * (scoreOn ? 0.25 : 0.4)));
+      var cur = synthHumGain.gain.value;
+      var sn = cur + (tgt - cur) * 0.08;
+      if (Math.abs(sn - tgt) < 0.002) sn = tgt;
+      else any = true;
+      synthHumGain.gain.value = sn;
+    }
+    if (any) fallStemRAF = requestAnimationFrame(tickFallAudio);
+    else fallStemRAF = null;
+  }
+
+  function kickFallAudio() {
+    if (!fallStemRAF) fallStemRAF = requestAnimationFrame(tickFallAudio);
+  }
+
+  function stopPossessionAudio() {
+    if (fallStemRAF) { cancelAnimationFrame(fallStemRAF); fallStemRAF = null; }
+    roomHumVol = 0;
+    if (roomHum) { roomHum.pause(); roomHum.volume = 0; }
+    if (synthHumGain) synthHumGain.gain.value = 0;
+  }
+
+  function showCaption(text, tuned) {
+    if (!testimonyLine) return;
+    currentCaption = text || "";
+    testimonyLine.textContent = currentCaption;
+    testimonyLine.classList.remove("is-visible", "is-tuned", "is-muted");
+    if (text) {
+      hideTestimonyPrompt();
+      testimonyLine.classList.add("is-visible");
+      if (tuned) testimonyLine.classList.add("is-tuned");
+    } else if (fallPossessionActive()) {
+      showTestimonyPrompt();
+    }
+    if (testimonyLayer) {
+      testimonyLayer.hidden = !(fallPossessionActive() || text);
+    }
+  }
+
+  function updatePossessionRead(ch, line, total) {
+    syncInhabitantChrome(ch);
+    if (possessionLineN) possessionLineN.textContent = line + " / " + total;
+  }
+
+  function showTurnPrompt(completedCh) {
+    if (!developTurn || getMemState("fall").seen) return;
+    if (fallBothSidesSeen()) { developTurn.hidden = true; return; }
+    var other = completedCh === "outer" ? "inner" : "outer";
+    if (getFallSides()[other].seen) { developTurn.hidden = true; return; }
+    developTurn.hidden = false;
+    developTurn.textContent = "PRESS C \u00b7 HEAR THE OTHER SIDE";
+  }
+
+  function hidePossessionVisuals() {
+    if (inhabitantView) inhabitantView.setClarity(0);
+    if (inhabitantMount) {
+      inhabitantMount.hidden = true;
+      inhabitantMount.classList.remove("is-on");
+      inhabitantMount.setAttribute("aria-hidden", "true");
+    }
+    if (testimonyLayer) testimonyLayer.hidden = true;
+    if (possessionLineN) possessionLineN.textContent = "";
+    if (developTurn) developTurn.hidden = true;
+    document.body.removeAttribute("data-inhabitant");
+    hideTestimonyPrompt();
+    clearFallHoldTimer();
+    showCaption("");
+    stopPossessionAudio();
+    if (possession) { possession.stop(); possession = null; }
+  }
+
+  function markFallSideComplete(ch) {
+    var fs = getFallSides()[ch];
+    fs.seen = true;
+    var m = getMemState("fall");
+    if (ch === "outer") m.viewedWorld = true;
+    else m.viewedInside = true;
+    save();
+  }
+
+  function fallSideComplete(ch) {
+    return !!getFallSides()[ch].seen;
+  }
+
+  function fallBothSidesSeen() {
+    return fallSideComplete("outer") && fallSideComplete("inner");
+  }
+
+  function resetFallSessionIfNeeded() {
+    var m = getMemState("fall");
+    if (m.seen) return;
+    if (fallBothSidesSeen()) {
+      state.fallSides = defaultFallSides();
+      save();
+    }
+  }
+
+  function clearFallHoldTimer() {
+    if (fallHoldTimer) { clearTimeout(fallHoldTimer); fallHoldTimer = null; }
+  }
+
+  function resetFallHoldState() {
+    fallHoldIdx = 0;
+    fallHoldActive = false;
+    fallHoldTuned = [false, false, false, false];
+    clearFallHoldTimer();
+  }
+
+  function fallActiveSide() {
+    return state.channel === "inner" ? "inner" : "outer";
+  }
+
+  // Reveal one testimony line: caption + counter + best-effort voice,
+  // then advance on a guaranteed timer (independent of speech events).
+  function playFallLine(i) {
+    var ch = fallActiveSide();
+    var inh = fallInhabitant(ch);
+    var line = inh.lines[i];
+    if (!line) return;
+    fallHoldIdx = i;
+    fallHoldActive = true;
+    hideTestimonyPrompt();
+    if (developTurn) developTurn.hidden = true;
+    updatePossessionRead(ch, i + 1, 4);
+    showCaption(line, true);
+    if (inhabitantView) inhabitantView.setClarity(1);
+    primeSpeech();
+    if (window.ChainSpeech) {
+      window.ChainSpeech.speak(line, { side: ch, immediate: true, replace: true });
+    }
+    clearFallHoldTimer();
+    fallHoldTimer = setTimeout(onFallLineDone, FALL_LINE_MS);
+  }
+
+  function onFallLineDone() {
+    clearFallHoldTimer();
+    fallHoldActive = false;
+    fallHoldTuned[fallHoldIdx] = true;
+    var ch = fallActiveSide();
+
+    if (fallHoldIdx >= 3) {
+      if (!fallSideComplete(ch)) markFallSideComplete(ch);
+      if (fallBothSidesSeen()) {
+        fallRecognition();
+      } else {
+        showTurnPrompt(ch);
+        showTestimonyPrompt("PRESS C \u00b7 HEAR THE OTHER SIDE");
+      }
+      return;
+    }
+
+    fallHoldIdx++;
+    if (isDevelopActive()) {
+      playFallLine(fallHoldIdx);
+    } else {
+      showTestimonyPrompt("PRESS \u00b7 HOLD \u00b7 NEXT LINE");
+    }
+  }
+
+  function fallBeginHold() {
+    if (!fallPossessionActive()) return;
+    if (fallHoldActive) return;
+    if (fallSideComplete(fallActiveSide())) return;
+    if (fallHoldIdx > 3) return;
+    playFallLine(fallHoldIdx);
+  }
+
+  function fallSwitchSide(ch) {
+    if (!fallPossessionActive()) return;
+    if (ch === fallActiveSide()) return;
+    if (!fallSideComplete(fallActiveSide())) return;
+    if (fallSideComplete(ch)) return;
+    clearFallHoldTimer();
+    fallHoldActive = false;
+    fallHoldIdx = 0;
+    fallHoldTuned = [false, false, false, false];
+    state.channel = ch;
+    document.body.setAttribute("data-channel", ch);
+    if (chOuter) chOuter.classList.toggle("on", ch === "outer");
+    if (chInner) chInner.classList.toggle("on", ch === "inner");
+    syncInhabitantChrome(ch);
+    if (inhabitantView) {
+      inhabitantView.setInhabitant(fallInhabPayload(ch));
+      inhabitantView.setClarity(0);
+      if (inhabitantView.arrive) inhabitantView.arrive(1400);
+    }
+    updatePossessionRead(ch, 1, 4);
+    showCaption("");
+    if (developTurn) developTurn.hidden = true;
+    showTestimonyPrompt("PRESS \u00b7 HOLD TO REVEAL");
+    save();
+  }
+
+  function fallRecognition() {
+    var m = getMemState("fall");
+    clearFallHoldTimer();
+    fallHoldActive = false;
+    document.body.classList.add("recognition-moment");
+    if (inhabitantView && inhabitantView.still) inhabitantView.still();
+    showCaption(FALL_SLICE.recognition, true);
+    fireRecognition("fall");
+    if (developTurn) developTurn.hidden = true;
+    hideTestimonyPrompt();
+    m.clarity = 1;
+    m.seen = true;
+    updateSeenMeter();
+    syncChainStrip();
+    refreshNodes();
+    setTimeout(function () {
+      document.body.classList.remove("recognition-moment");
+      showCaption("");
+      setHumTarget(0.08);
+      applyClarityVisuals("fall");
+    }, 3400);
+    save();
+  }
+
+  function fallPossessionActive() {
+    return isPossessionMode() && audioUnlocked && !fallBothSidesSeen() && !getMemState("fall").seen;
+  }
+
+  function canDevelop(id) {
+    if (id === "fall" && isPossessionMode()) return audioUnlocked && !fallBothSidesSeen();
+    return !getMemState(id).seen;
+  }
+
+  function showTestimonyPrompt(text) {
+    if (!testimonyPrompt) return;
+    testimonyPrompt.textContent = text || "PRESS · HOLD TO REVEAL";
+    testimonyPrompt.hidden = false;
+  }
+
+  function hideTestimonyPrompt() {
+    if (testimonyPrompt) testimonyPrompt.hidden = true;
+  }
+
+  function showFallStageUI(ch) {
+    if (!isPossessionMode()) return;
+    ch = ch || state.channel || "outer";
+    syncPossessionUI();
+    syncInhabitantChrome(ch);
+    state.channel = ch;
+    document.body.setAttribute("data-channel", ch);
+    if (chOuter) chOuter.classList.toggle("on", ch === "outer");
+    if (chInner) chInner.classList.toggle("on", ch === "inner");
+    if (inhabitantMount) {
+      inhabitantMount.hidden = false;
+      inhabitantMount.classList.add("is-on");
+      inhabitantMount.setAttribute("aria-hidden", "false");
+    }
+    if (testimonyLayer) testimonyLayer.hidden = false;
+    updatePossessionRead(ch, 1, 4);
+    showCaption("");
+    showTestimonyPrompt();
+    updateDevelopZone("fall");
+  }
+
+  // Fall testimony is fully owned by chain.js (timer-driven hold sequence).
+  // The 3D renderer is used only for the face; possession stays null.
+  function startVoicePossession() {
+    if (!audioUnlocked) return;
+    var m = getMemState("fall");
+    var sides = getFallSides();
+    var startCh = sides.outer.seen ? "inner" : "outer";
+    if (sides.outer.seen && sides.inner.seen) startCh = state.channel || "outer";
+    state.channel = startCh;
+    document.body.setAttribute("data-channel", startCh);
+    if (chOuter) chOuter.classList.toggle("on", startCh === "outer");
+    if (chInner) chInner.classList.toggle("on", startCh === "inner");
+    showFallStageUI(startCh);
+
+    var view = ensureInhabitantView();
+    var payload = fallInhabPayload(startCh);
+    possession = null;
+
+    var fullyDone = m.seen && fallBothSidesSeen();
+
+    if (view) {
+      view.setInhabitant(payload);
+      if (view.setDrift) view.setDrift(1);
+      if (fullyDone) {
+        view.setClarity(1);
+        if (view.still) view.still();
+      } else {
+        view.setClarity(0);
+        if (view.arrive) view.arrive(1600);
+      }
+      requestAnimationFrame(function () { if (inhabitantView) inhabitantView.resize(); });
+    }
+
+    if (fullyDone) {
+      showCaption("");
+      hideTestimonyPrompt();
+      updatePossessionRead(startCh, 4, 4);
+      return;
+    }
+
+    resetFallHoldState();
+    updatePossessionRead(startCh, 1, 4);
+    showCaption("");
+    showTestimonyPrompt("PRESS \u00b7 HOLD TO REVEAL");
+    ensureDevelopLoop();
+  }
+
+  function stopPossession() {
+    hidePossessionVisuals();
+    document.body.classList.remove("memory-possession", "recognition-moment");
+    if (chainStrip) chainStrip.hidden = true;
+  }
+
+  function possessionChannelTurn(ch) {
+    if (!possession || !isPossessionMode()) return;
+    if (getMemState("fall").seen) return;
+    var cur = possession.getSide();
+    if (ch === cur) return;
+    if (!fallSideComplete(cur)) return;
+    possession.switchSide(ch, fallInhabPayload(ch));
+    if (developTurn) developTurn.hidden = true;
   }
 
   function countSeen() {
@@ -260,11 +816,13 @@
   }
 
   function perspectiveGate(id) {
+    if (id === "fall") return fallBothSidesSeen();
     var m = getMemState(id);
     return m.viewedWorld && m.viewedInside;
   }
 
   function trackPerspective(id) {
+    if (id === "fall") return;
     var m = getMemState(id);
     if (state.channel === "outer") m.viewedWorld = true;
     else m.viewedInside = true;
@@ -277,11 +835,22 @@
     if (perspectiveGate(id)) lockSeen(id);
   }
 
+  function setScoreVolume(v) {
+    if (!scWidget) return;
+    var n = typeof v === "number" ? v : 100;
+    scWidget.setVolume(Math.max(0, Math.min(100, Math.round(n * SCORE_VOL_SCALE))));
+  }
+
   function syncMusicToClarity(c, seen) {
     if (!scWidget || !scReady) return;
     if (!score.classList.contains("playing")) return;
-    var vol = Math.round((seen ? 1 : Math.max(0.45, c)) * 100);
-    scWidget.setVolume(Math.max(0, Math.min(100, vol)));
+    if (state.active === "fall" && audioUnlocked && !seen) {
+      setScoreVolume(Math.max(72, Math.round(Math.max(0.72, c) * 100)));
+      return;
+    }
+    var floor = (state.active === "fall" && audioUnlocked) ? 0.55 : 0.45;
+    var vol = Math.round((seen ? 1 : Math.max(floor, c)) * 100);
+    setScoreVolume(vol);
   }
 
   function maybePlayForDevelop(c) {
@@ -296,10 +865,15 @@
     if (!developPersp) return;
     var m = getMemState(id);
     if (m.seen) { developPersp.hidden = true; return; }
+    if (id === "fall") {
+      developPersp.hidden = true;
+      if (developHint) developHint.textContent = "PRESS · HOLD TO REVEAL";
+      return;
+    }
     var need = !m.viewedWorld || !m.viewedInside;
     developPersp.hidden = !(need && m.clarity >= 0.5);
     if (!developPersp.hidden) {
-      if (!m.viewedWorld && !m.viewedInside) developPersp.textContent = "SEE THE WORLD · THEN INSIDE HIM";
+      if (!m.viewedWorld && !m.viewedInside) developPersp.textContent = "SEE THE WORLD \u00b7 THEN INSIDE HIM";
       else if (!m.viewedWorld) developPersp.textContent = "LOOK FROM THE WORLD";
       else developPersp.textContent = "LOOK FROM INSIDE HIM";
     }
@@ -307,20 +881,33 @@
 
   function updateDevelopZone(id) {
     if (!developZone) return;
-    var show = inMemoryView() && !getMemState(id).seen;
+    var show = inMemoryView() && canDevelop(id);
     developZone.hidden = !show;
     developZone.setAttribute("aria-hidden", show ? "false" : "true");
+    if (developHint) {
+      // Fall uses the centered testimony prompt as its single instruction;
+      // keep the develop-zone hint hidden to avoid a duplicate line.
+      if (id === "fall") developHint.hidden = true;
+      else developHint.hidden = !show;
+    }
+  }
+
+  function primeSpeech() {
+    if (window.ChainSpeech) window.ChainSpeech.prime();
+    else if (window.speechSynthesis) window.speechSynthesis.getVoices();
   }
 
   function applyClarityVisuals(id) {
     var m = getMemState(id);
     var c = m.seen ? 1 : m.clarity;
+    var memSeenVisual = m.seen && !(id === "fall" && fallPossessionActive());
     stage.style.setProperty("--clarity", String(c));
-    stage.style.setProperty("--seen", m.seen ? "1" : "0");
-    stage.classList.toggle("mem-seen", m.seen);
-    stage.classList.toggle("clarity-waiting", !m.seen && m.clarity >= LOCK_THRESH - 0.02 && !perspectiveGate(id));
+    stage.style.setProperty("--seen", memSeenVisual ? "1" : "0");
+    stage.classList.toggle("mem-seen", memSeenVisual);
+    stage.classList.toggle("clarity-waiting", !m.seen && id === "fall" && possession && fallSideComplete(possession.getSide()) && !fallBothSidesSeen());
     updateDevelopPrompt(id);
     updateDevelopZone(id);
+    if (id === "fall" && inhabitantView && !possession) inhabitantView.setClarity(c);
     syncMusicToClarity(c, m.seen);
   }
 
@@ -350,7 +937,23 @@
     applyClarityVisuals(id);
     refreshNodes();
     updateSeenMeter();
-    fireRecognition(id);
+    syncChainStrip();
+
+    if (id === "fall" && possession) {
+      document.body.classList.add("recognition-moment");
+      showCaption(FALL_SLICE.recognition, true);
+      possession.fireRecognition(FALL_SLICE.recognition, FALL_SLICE.recognitionAudio);
+      fireRecognition(id);
+      if (developTurn) developTurn.hidden = true;
+      setTimeout(function () {
+        possession.recess();
+        document.body.classList.remove("recognition-moment");
+        showCaption("");
+        setHumTarget(0.08);
+      }, 3200);
+    } else {
+      fireRecognition(id);
+    }
     save();
   }
 
@@ -369,7 +972,7 @@
     }
     var id = state.active;
     var m = getMemState(id);
-    if (m.seen) {
+    if (m.seen && !(id === "fall" && fallPossessionActive())) {
       developRAF = null;
       developing = false;
       stage.classList.remove("developing");
@@ -377,6 +980,17 @@
     }
     var dt = Math.min(0.05, (ts - lastDevelopTs) / 1000);
     lastDevelopTs = ts;
+
+    if (id === "fall" && fallPossessionActive()) {
+      var holdingFall = isDevelopActive();
+      var targetC = (fallHoldActive || holdingFall) ? 1 : Math.max(0.22, m.clarity);
+      m.clarity += (targetC - m.clarity) * Math.min(1, dt * 3.5);
+      if (inhabitantView) inhabitantView.setClarity(m.clarity);
+      if (fallHoldActive) maybePlayForDevelop(0.85);
+      applyClarityVisuals(id);
+      developRAF = requestAnimationFrame(developTick);
+      return;
+    }
 
     if (isDevelopActive()) {
       var prev = m.clarity;
@@ -411,7 +1025,7 @@
 
   function startDevelop(e) {
     if (!inMemoryView()) return;
-    if (getMemState(state.active).seen) return;
+    if (!canDevelop(state.active)) return;
     developing = true;
     if (e && typeof e.pointerId === "number") {
       developPointer = true;
@@ -420,6 +1034,7 @@
       }
     }
     stage.classList.add("developing");
+    if (state.active === "fall" && fallPossessionActive()) fallBeginHold();
     ensureDevelopLoop();
   }
 
@@ -446,12 +1061,19 @@
 
   function onStagePointerDown(e) {
     if (!inMemoryView()) return;
-    if (getMemState(state.active).seen) return;
-    if (e.target.closest(".node .badge, .readout, button, .recognition-flash")) return;
+    if (!canDevelop(state.active)) return;
+    if (e.target.closest(".node .badge, .readout, button, .recognition-flash, .lower, .chain-strip")) return;
     startDevelop(e);
   }
 
   stage.addEventListener("pointerdown", onStagePointerDown);
+  if (developZone) {
+    developZone.addEventListener("pointerdown", function (e) {
+      if (!inMemoryView() || !canDevelop(state.active)) return;
+      e.preventDefault();
+      startDevelop(e);
+    });
+  }
   stage.addEventListener("pointerup", endDevelopPointer);
   stage.addEventListener("pointercancel", endDevelopPointer);
   stage.addEventListener("pointerleave", function (e) {
@@ -627,12 +1249,17 @@
   }
 
   function render(f) {
+    syncPossessionUI();
     tcYr.textContent = f.era.toUpperCase();
     tcIdx.textContent = "MEMORY " + f.recv + " OF " + TOTAL;
     tcTitle.textContent = f.title;
     tcLine.textContent = f.line;
 
-    roChannel.textContent = state.channel === "inner" ? "INSIDE HIM" : "THE WORLD";
+    if (f.id === "fall") {
+      roChannel.textContent = fallInhabitant(state.channel).channelLabel;
+    } else {
+      roChannel.textContent = state.channel === "inner" ? "INSIDE HIM" : "THE WORLD";
+    }
     roFrag.textContent = f.recv + " / " + TOTAL;
     roEra.textContent = f.era.toUpperCase();
 
@@ -640,25 +1267,38 @@
       return '<span class="chip' + (r.lead ? " lead" : "") + '">' + r.t + '</span>';
     }).join("");
 
-    if (state.channel === "inner") {
-      roDecode.innerHTML = "<b>" + f.inner.g + "</b><br>" + f.inner.line;
-      roSeedTxt.textContent = f.inner.seed;
-      roSeed.classList.toggle("idle", !!f.inner.idle);
-    } else {
-      roDecode.innerHTML = f.outer;
-      roSeedTxt.textContent = "it was never them";
-      roSeed.classList.remove("idle");
+    if (f.id !== "fall") {
+      if (state.channel === "inner") {
+        roDecode.innerHTML = "<b>" + f.inner.g + "</b><br>" + f.inner.line;
+        roSeedTxt.textContent = f.inner.seed;
+        roSeed.classList.toggle("idle", !!f.inner.idle);
+      } else {
+        roDecode.innerHTML = f.outer;
+        roSeedTxt.textContent = "it was never them";
+        roSeed.classList.remove("idle");
+      }
     }
-    updateMemoryBackground(f);
+
+    if (f.id === "fall") {
+      if (audioUnlocked) startVoicePossession();
+    } else {
+      stopPossession();
+      updateMemoryBackground(f);
+    }
     updateMemCrumb(f);
     trackPerspective(f.id);
     applyClarityVisuals(f.id);
+    syncChainStrip();
   }
 
   // ============================================================
   // CHANNEL
   // ============================================================
   function setChannel(ch) {
+    if (isPossessionMode() && fallPossessionActive()) {
+      if (ch !== fallActiveSide()) fallSwitchSide(ch);
+      return;
+    }
     state.channel = ch;
     document.body.setAttribute("data-channel", ch);
     chOuter.classList.toggle("on", ch === "outer");
@@ -694,6 +1334,7 @@
   // JOG + KEYBOARD
   // ============================================================
   function jog(dir) {
+    if (isPossessionMode() && !getMemState("fall").seen) return;
     var arr = state.order === "received" ? RECEIVED : REMEMBERED;
     var i = arr.indexOf(state.active);
     var n = i + dir;
@@ -713,11 +1354,12 @@
     if (e.key === "ArrowRight") { e.preventDefault(); jog(1); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); jog(-1); }
     else if (e.key.toLowerCase() === "c") { setChannel(state.channel === "outer" ? "inner" : "outer"); }
-    else if (e.code === "Space" && !getMemState(state.active).seen) {
+    else if (e.code === "Space" && canDevelop(state.active)) {
       e.preventDefault();
       if (!developSpace) {
         developSpace = true;
         developing = true;
+        if (state.active === "fall" && fallPossessionActive()) fallBeginHold();
         stage.classList.add("developing");
         ensureDevelopLoop();
       }
@@ -742,6 +1384,7 @@
   var cueIdx = 0;
   var scoreGestureUnlocked = false;
   var scoreInited = false;
+  var scoreWidgetBound = false;
 
   function unlockScoreGesture() {
     scoreGestureUnlocked = true;
@@ -783,10 +1426,20 @@
   function ensureScorePlaying(vol) {
     if (!scWidget || !scReady || scLoadPending) {
       scoreAutoplayPending = true;
-      return;
+      return false;
     }
-    scWidget.setVolume(typeof vol === "number" ? vol : 100);
+    setScoreVolume(typeof vol === "number" ? vol : 100);
     scWidget.play();
+    return true;
+  }
+
+  function retryScorePlay(delays) {
+    (delays || [0, 120, 400, 900, 1800]).forEach(function (ms) {
+      setTimeout(function () {
+        if (!scoreAutoplayPending) return;
+        if (ensureScorePlaying(100)) scoreAutoplayPending = false;
+      }, ms);
+    });
   }
 
   /** Call only from click / pointerdown / keydown handlers — sync play() in gesture context */
@@ -796,12 +1449,16 @@
     if (!t) return;
     cueIdx = i;
     updateScoreLabel();
+    scoreAutoplayPending = true;
     if (scWidget && scReady && !scLoadPending && loadedCueIdx === i) {
-      ensureScorePlaying(100);
+      if (ensureScorePlaying(100)) {
+        scoreAutoplayPending = false;
+        retryScorePlay([120, 500]);
+      }
       return;
     }
-    scoreAutoplayPending = true;
     loadScoreCue(i, true);
+    retryScorePlay();
   }
 
   function loadScoreCue(i, autoplay) {
@@ -811,20 +1468,32 @@
     cueIdx = i;
     updateScoreLabel();
     if (scWidget && scReady && !scLoadPending && loadedCueIdx === i) {
-      if (shouldPlay) ensureScorePlaying(100);
+      if (shouldPlay) {
+        scoreAutoplayPending = true;
+        if (ensureScorePlaying(100)) scoreAutoplayPending = false;
+        else retryScorePlay();
+      }
       return;
     }
     if (!scWidget) {
       pendingCue = i;
       pendingAutoplay = shouldPlay;
+      scoreAutoplayPending = shouldPlay;
       if (scoreIframe) scoreIframe.src = scoreEmbedSrc(t, shouldPlay);
+      if (shouldPlay) retryScorePlay();
       return;
     }
-    if (scLoadPending) return;
+    if (scLoadPending) {
+      pendingCue = i;
+      pendingAutoplay = shouldPlay;
+      scoreAutoplayPending = shouldPlay;
+      return;
+    }
     scoreAutoplayPending = shouldPlay;
     scReady = false;
     scLoadPending = true;
     scWidget.load(t.page, { auto_play: shouldPlay });
+    if (shouldPlay) retryScorePlay();
   }
 
   function advanceScoreCue() {
@@ -834,13 +1503,8 @@
 
   function toggleScorePlayback() {
     unlockScoreGesture();
-    var t = SCORE_CUE[cueIdx];
-    if (!scWidget) {
-      window.open(t ? t.page : SCORE_CUE[0].page, "_blank", "noopener,noreferrer");
-      return;
-    }
-    if (!scReady || scLoadPending) {
-      scoreAutoplayPending = true;
+    if (!scWidget || !scReady || scLoadPending) {
+      hardStartScore(cueIdx);
       return;
     }
     scWidget.isPaused(function (paused) {
@@ -849,39 +1513,74 @@
     });
   }
 
+  function onScorePlay() {
+    score.classList.add("playing");
+    scoreAutoplayPending = false;
+    if (charSelect && !charSelect.classList.contains("gone")) {
+      setScoreVolume(100);
+      return;
+    }
+    var ms = getMemState(state.active);
+    if (state.active === "fall" && audioUnlocked && !ms.seen) {
+      setScoreVolume(Math.max(72, Math.round(Math.max(0.72, ms.clarity) * 100)));
+      return;
+    }
+    syncMusicToClarity(ms.seen ? 1 : Math.max(0.45, ms.clarity), ms.seen);
+  }
+
+  function onScoreReady() {
+    scReady = true;
+    scLoadPending = false;
+    loadedCueIdx = cueIdx;
+    updateScoreLabel();
+    if (pendingCue !== null) {
+      var i = pendingCue;
+      var ap = pendingAutoplay;
+      pendingCue = null;
+      pendingAutoplay = false;
+      loadScoreCue(i, ap);
+      return;
+    }
+    if (scoreAutoplayPending) {
+      scoreAutoplayPending = false;
+      ensureScorePlaying(100);
+    }
+  }
+
+  function bindScoreWidget() {
+    if (!scoreIframe || !window.SC || !window.SC.Widget) return false;
+    if (!scWidget) scWidget = SC.Widget(scoreIframe);
+    if (scoreWidgetBound) return true;
+    scoreWidgetBound = true;
+    scWidget.bind(SC.Widget.Events.READY, onScoreReady);
+    scWidget.bind(SC.Widget.Events.PLAY, onScorePlay);
+    scWidget.bind(SC.Widget.Events.PAUSE, function () { score.classList.remove("playing"); });
+    scWidget.bind(SC.Widget.Events.FINISH, advanceScoreCue);
+    return true;
+  }
+
+  /** Load + play score inside a user-gesture handler */
+  function hardStartScore(i) {
+    var t = SCORE_CUE[i];
+    if (!t || !scoreIframe) return;
+    unlockScoreGesture();
+    cueIdx = i;
+    scoreAutoplayPending = true;
+    updateScoreLabel();
+    loadedCueIdx = -1;
+    scReady = false;
+    scLoadPending = true;
+    scoreIframe.src = scoreEmbedSrc(t, true);
+    scoreWidgetBound = false;
+    scWidget = null;
+    bindScoreWidget();
+    retryScorePlay([0, 400, 1000, 2000, 3500]);
+  }
+
   function initScore() {
     if (scoreInited || !scoreIframe || !window.SC || !window.SC.Widget) return;
     scoreInited = true;
-    scWidget = SC.Widget(scoreIframe);
-    scWidget.bind(SC.Widget.Events.READY, function () {
-      scReady = true;
-      scLoadPending = false;
-      loadedCueIdx = cueIdx;
-      updateScoreLabel();
-      if (pendingCue !== null) {
-        var i = pendingCue;
-        var ap = pendingAutoplay;
-        pendingCue = null;
-        pendingAutoplay = false;
-        loadScoreCue(i, ap);
-        return;
-      }
-      if (scoreAutoplayPending) {
-        scoreAutoplayPending = false;
-        ensureScorePlaying(100);
-      }
-    });
-    scWidget.bind(SC.Widget.Events.PLAY, function () {
-      score.classList.add("playing");
-      if (charSelect && !charSelect.classList.contains("gone")) {
-        scWidget.setVolume(100);
-        return;
-      }
-      var ms = getMemState(state.active);
-      syncMusicToClarity(ms.seen ? 1 : Math.max(0.45, ms.clarity), ms.seen);
-    });
-    scWidget.bind(SC.Widget.Events.PAUSE, function () { score.classList.remove("playing"); });
-    scWidget.bind(SC.Widget.Events.FINISH, advanceScoreCue);
+    bindScoreWidget();
     updateScoreLabel();
   }
 
@@ -1369,15 +2068,57 @@
     playScoreOnGesture(scoreCueFor(id));
   }
 
+  function onTuneIn() {
+    if (audioUnlocked) return;
+    audioUnlocked = true;
+    pendingFallEntry = false;
+    resetFallSessionIfNeeded();
+    primeSpeech();
+    syncPossessionUI();
+    showFallStageUI(getFallSides().outer.seen ? "inner" : "outer");
+    startVoicePossession();
+    if (tuneGate) {
+      tuneGate.classList.add("is-off");
+      setTimeout(function () {
+        tuneGate.hidden = true;
+        tuneGate.setAttribute("aria-hidden", "true");
+      }, 900);
+    }
+    startClock();
+    unlockScoreGesture();
+    setTimeout(function () {
+      try { hardStartScore(scoreCueFor("fall")); } catch (e) { playScoreOnGesture(scoreCueFor("fall")); }
+    }, 350);
+    ensureSynthHum();
+    if (synthHumCtx && synthHumCtx.state === "suspended") synthHumCtx.resume();
+    setHumTarget(0.06);
+    applyClarityVisuals("fall");
+    ensureDevelopLoop();
+  }
+  if (tuneGateBtn) tuneGateBtn.addEventListener("click", onTuneIn);
+
   function enterWith(id) {
     if (charLocked(id)) return;
-    playScoreOnGesture(scoreCueFor(id));
+    if (id !== "fall") playScoreOnGesture(scoreCueFor(id));
     charSelect.classList.add("gone");
     if (tv) tv.stop();
     state.opened = true;
-    startClock();
-    if (!reduceMotion) startIdle();
-    select(id, true);
+
+    if (id === "fall") {
+      pendingFallEntry = true;
+      audioUnlocked = false;
+      stopIdle();
+      if (tuneGate) {
+        tuneGate.hidden = false;
+        tuneGate.classList.remove("is-off");
+        tuneGate.setAttribute("aria-hidden", "false");
+      }
+      select(id, true);
+    } else {
+      startClock();
+      if (!reduceMotion) startIdle();
+      select(id, true);
+    }
     save();
   }
 
@@ -1398,6 +2139,15 @@
     if (developRAF) { cancelAnimationFrame(developRAF); developRAF = null; }
     stage.classList.remove("developing");
     state.opened = false;
+    audioUnlocked = false;
+    pendingFallEntry = false;
+    if (tuneGate) {
+      tuneGate.classList.add("is-off");
+      tuneGate.hidden = true;
+      tuneGate.setAttribute("aria-hidden", "true");
+    }
+    stopPossession();
+    syncPossessionUI();
     hideMemoryBackground();
     updateMemCrumb(null);
     openRoster();
@@ -1406,7 +2156,10 @@
 
   function featuredPick() { return csHover || csPick; }
 
-  window.addEventListener("resize", function () { if (tv) tv.resize(); });
+  window.addEventListener("resize", function () {
+    if (tv) tv.resize();
+    if (inhabitantView) inhabitantView.resize();
+  });
   if (roster) {
     roster.addEventListener("pointerover", onRosterPointerOver);
     roster.addEventListener("pointerdown", onRosterPointerDown);
@@ -1448,10 +2201,18 @@
           if (s.active && byId[s.active]) state.active = s.active;
           state.opened = !!s.opened;
           if (s.memoryState && typeof s.memoryState === "object") state.memoryState = s.memoryState;
+          if (s.fallSides && typeof s.fallSides === "object") state.fallSides = s.fallSides;
         }
       }
     } catch (e) {}
     initMemoryStates();
+    if (!state.fallSides) state.fallSides = defaultFallSides();
+    ["outer", "inner"].forEach(function (ch) {
+      var s = state.fallSides[ch];
+      if (s && typeof s.seen !== "boolean") {
+        s.seen = !!(s.testimonyDone && s.clarityLocked);
+      }
+    });
   }
 
   // ============================================================
@@ -1478,9 +2239,30 @@
 
     if (state.opened && state.active && !charLocked(state.active)) {
       charSelect.classList.add("gone");
-      startClock();
-      if (!reduceMotion) startIdle();
+      if (state.active === "fall") {
+        audioUnlocked = false;
+        if (tuneGate) {
+          tuneGate.hidden = false;
+          tuneGate.classList.remove("is-off");
+          tuneGate.setAttribute("aria-hidden", "false");
+        }
+        stopIdle();
+      } else {
+        startClock();
+        if (!reduceMotion) startIdle();
+        else stopIdle();
+        if (tuneGate) {
+          tuneGate.hidden = true;
+          tuneGate.classList.add("is-off");
+          tuneGate.setAttribute("aria-hidden", "true");
+        }
+      }
     } else {
+      if (tuneGate) {
+        tuneGate.hidden = true;
+        tuneGate.classList.add("is-off");
+        tuneGate.setAttribute("aria-hidden", "true");
+      }
       state.opened = false;
       hideMemoryBackground();
       charSelect.classList.remove("gone");
