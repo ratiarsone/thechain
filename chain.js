@@ -1684,6 +1684,9 @@
     loadedCueIdx = -1;
     scReady = false;
     scLoadPending = true;
+    // Reload the iframe with autoplay baked into the URL. The play intent
+    // travels with the navigation, which we trigger inside the user gesture —
+    // this is what lets Safari actually start the audio.
     scoreIframe.src = scoreEmbedSrc(t, true);
     scoreWidgetBound = false;
     scWidget = null;
@@ -2206,9 +2209,10 @@
     }
     startClock();
     unlockScoreGesture();
-    setTimeout(function () {
-      try { hardStartScore(scoreCueFor("fall")); } catch (e) { playScoreOnGesture(scoreCueFor("fall")); }
-    }, 350);
+    // Start the score synchronously inside this click. Safari only permits
+    // audio that begins within the user-gesture call stack — a setTimeout here
+    // moves it outside the gesture and Safari silently blocks playback.
+    try { hardStartScore(scoreCueFor("fall")); } catch (e) { playScoreOnGesture(scoreCueFor("fall")); }
     ensureSynthHum();
     if (synthHumCtx && synthHumCtx.state === "suspended") synthHumCtx.resume();
     setHumTarget(0.06);
