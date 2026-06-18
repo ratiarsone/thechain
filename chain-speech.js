@@ -5,8 +5,8 @@
   "use strict";
 
   var cachedVoices = [];
-  var resumeInterval = null;
   var pending = null;
+  var activeText = "";
 
   function synth() {
     return global.speechSynthesis || null;
@@ -28,27 +28,6 @@
     });
   }
 
-  function stopKeepAlive() {
-    if (resumeInterval) {
-      clearInterval(resumeInterval);
-      resumeInterval = null;
-    }
-  }
-
-  function startKeepAlive() {
-    if (resumeInterval) return;
-    resumeInterval = setInterval(function () {
-      var s = synth();
-      if (!s) return stopKeepAlive();
-      if (s.speaking) {
-        s.pause();
-        s.resume();
-      } else {
-        stopKeepAlive();
-      }
-    }, 120);
-  }
-
   function findVoice(side) {
     refreshVoices();
     var voices = cachedVoices;
@@ -59,10 +38,18 @@
       if (voices[i].lang && voices[i].lang.indexOf("en") === 0) en.push(voices[i]);
     }
     var pool = en.length ? en : voices;
-    for (var j = 0; j < pool.length; j++) {
-      var name = pool[j].name || "";
-      if (preferFemale && /female|woman|samantha|victoria|karen|moira|fiona|tessa/i.test(name)) return pool[j];
-      if (!preferFemale && /male|man|daniel|alex|fred|tom|aaron|nathan/i.test(name)) return pool[j];
+    var prefer = preferFemale
+      ? [/Samantha/i, /Karen/i, /Moira/i, /Victoria/i, /Fiona/i, /Tessa/i]
+      : [/Alex/i, /Tom/i, /Daniel/i, /Fred/i, /Aaron/i, /Nathan/i];
+    for (var p = 0; p < prefer.length; p++) {
+      for (var j = 0; j < pool.length; j++) {
+        if (prefer[p].test(pool[j].name || "")) return pool[j];
+      }
+    }
+    for (var k = 0; k < pool.length; k++) {
+      var name = pool[k].name || "";
+      if (preferFemale && /female|woman/i.test(name)) return pool[k];
+      if (!preferFemale && /male|man/i.test(name)) return pool[k];
     }
     return pool[0] || null;
   }
@@ -76,17 +63,24 @@
 
   function buildUtterance(text, opts, finish) {
     var utt = new global.SpeechSynthesisUtterance(text);
-    utt.rate = opts.rate != null ? opts.rate : (opts.side === "inner" ? 0.94 : 0.82);
-    utt.pitch = opts.pitch != null ? opts.pitch : (opts.side === "inner" ? 1.1 : 0.74);
+    utt.rate = opts.rate != null ? opts.rate : (opts.side === "inner" ? 0.96 : 0.92);
+    utt.pitch = opts.pitch != null ? opts.pitch : (opts.side === "inner" ? 1.02 : 0.98);
     utt.volume = opts.volume != null ? opts.volume : 1;
     utt.lang = opts.lang || "en-US";
     var voice = findVoice(opts.side);
     if (voice) utt.voice = voice;
     utt.onstart = function () {
+      activeText = text;
       if (opts.onStart) opts.onStart();
     };
-    utt.onend = function () { finish(null); };
-    utt.onerror = function (e) { finish(e || new Error("speech")); };
+    utt.onend = function () {
+      if (activeText === text) activeText = "";
+      finish(null);
+    };
+    utt.onerror = function (e) {
+      if (activeText === text) activeText = "";
+      finish(e || new Error("speech"));
+    };
     return utt;
   }
 
@@ -96,14 +90,17 @@
     if (!text || !s) return false;
 
     refreshVoices();
-    s.resume();
-    startKeepAlive();
 
     if (!cachedVoices.length && !opts._voiceRetry) {
       pending = { text: text, opts: Object.assign({}, opts, { _voiceRetry: true }), onDone: onDone };
       global.setTimeout(function () {
         if (pending && pending.text === text) flushPending();
-      }, 150);
+      }, 200);
+      return true;
+    }
+
+    if (opts.replace === false && activeText === text && (s.speaking || s.pending)) {
+      return true;
     }
 
     var finished = false;
@@ -111,26 +108,16 @@
       if (finished) return;
       finished = true;
       if (onDone) onDone(err || null);
-      if (!s.speaking && !s.pending) stopKeepAlive();
     }
 
-    if (opts.replace !== false) s.cancel();
-
-    function enqueue(retry) {
-      var utt = buildUtterance(text, opts, finish);
-      s.speak(utt);
-      if (!retry && !opts.immediate) {
-        global.setTimeout(function () {
-          if (!finished && !s.speaking && !s.pending) enqueue(true);
-        }, 300);
-      }
+    if (opts.replace !== false) {
+      activeText = "";
+      s.cancel();
     }
 
-    if (opts.immediate) {
-      enqueue(false);
-    } else {
-      global.setTimeout(function () { enqueue(false); }, 16);
-    }
+    s.resume();
+    var utt = buildUtterance(text, opts, finish);
+    s.speak(utt);
     return true;
   }
 
@@ -139,13 +126,16 @@
     if (!s) return;
     refreshVoices();
     s.resume();
+    if (!cachedVoices.length) {
+      global.setTimeout(refreshVoices, 250);
+    }
   }
 
   function cancel() {
     pending = null;
+    activeText = "";
     var s = synth();
     if (s) s.cancel();
-    stopKeepAlive();
   }
 
   function speaking() {

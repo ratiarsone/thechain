@@ -224,12 +224,13 @@
   var audioUnlocked = false;
   var pendingFallEntry = false;
   var currentCaption = "";
-  var FALL_LINE_MS = 2600;
   var SCORE_VOL_SCALE = 0.35; // song at ~35% so testimony lines sit clearly above it
   var fallHoldIdx = 0;
   var fallHoldActive = false;
   var fallHoldTuned = [false, false, false, false];
   var fallHoldTimer = null;
+  var fallLineAudio = null;
+  var lastSyncScoreVol = -1;
 
   var RING_R = 356;
   var nodeEls = {};
@@ -547,6 +548,7 @@
     document.body.removeAttribute("data-inhabitant");
     hideTestimonyPrompt();
     clearFallHoldTimer();
+    stopFallLineAudio();
     showCaption("");
     stopPossessionAudio();
     if (possession) { possession.stop(); possession = null; }
@@ -589,17 +591,38 @@
     clearFallHoldTimer();
   }
 
+  function stopFallLineAudio() {
+    if (fallLineAudio) {
+      fallLineAudio.pause();
+      fallLineAudio.removeAttribute("src");
+      fallLineAudio = null;
+    }
+    if (window.ChainSpeech) window.ChainSpeech.cancel();
+  }
+
+  function isFallLineSpeaking() {
+    if (fallLineAudio && !fallLineAudio.paused && !fallLineAudio.ended) return true;
+    if (window.ChainSpeech && window.ChainSpeech.speaking()) return true;
+    return false;
+  }
+
+  function fallLineWaitMs(text) {
+    var words = (text || "").split(/\s+/).filter(Boolean).length;
+    return Math.max(4000, Math.min(12000, words * 450 + 900));
+  }
+
   function fallActiveSide() {
     return state.channel === "inner" ? "inner" : "outer";
   }
 
-  // Reveal one testimony line: caption + counter + best-effort voice,
-  // then advance on a guaranteed timer (independent of speech events).
+  // Reveal one testimony line: caption + counter + voice (MP3 if present, else TTS).
+  // Advance after speech finishes; timer is only a fallback.
   function playFallLine(i) {
     var ch = fallActiveSide();
     var inh = fallInhabitant(ch);
     var line = inh.lines[i];
     if (!line) return;
+    stopFallLineAudio();
     fallHoldIdx = i;
     fallHoldActive = true;
     hideTestimonyPrompt();
@@ -607,16 +630,51 @@
     updatePossessionRead(ch, i + 1, 4);
     showCaption(line, true);
     if (inhabitantView) inhabitantView.setClarity(1);
-    primeSpeech();
-    if (window.ChainSpeech) {
-      window.ChainSpeech.speak(line, { side: ch, immediate: true, replace: true });
+    setHumTarget(0.01);
+
+    var url = inh.voices && inh.voices[i];
+    var waitMs = fallLineWaitMs(line);
+
+    function armTimer(ms) {
+      clearFallHoldTimer();
+      fallHoldTimer = setTimeout(onFallLineDone, ms);
     }
-    clearFallHoldTimer();
-    fallHoldTimer = setTimeout(onFallLineDone, FALL_LINE_MS);
+
+    function voiceEnded() {
+      if (!fallHoldActive || fallHoldIdx !== i) return;
+      clearFallHoldTimer();
+      fallHoldTimer = setTimeout(onFallLineDone, isDevelopActive() ? 220 : 0);
+    }
+
+    function startTTS() {
+      primeSpeech();
+      if (window.ChainSpeech) {
+        window.ChainSpeech.speak(line, { side: ch, immediate: true, replace: true }, voiceEnded);
+      }
+      armTimer(waitMs);
+    }
+
+    if (url) {
+      fallLineAudio = new Audio(url);
+      fallLineAudio.preload = "auto";
+      fallLineAudio.addEventListener("ended", voiceEnded);
+      fallLineAudio.addEventListener("error", startTTS);
+      fallLineAudio.play().then(function () {
+        armTimer(Math.max(waitMs, 10000));
+      }).catch(startTTS);
+    } else {
+      startTTS();
+    }
   }
 
   function onFallLineDone() {
+    if (isFallLineSpeaking()) {
+      fallHoldTimer = setTimeout(onFallLineDone, 200);
+      return;
+    }
     clearFallHoldTimer();
+    stopFallLineAudio();
+    setHumTarget(0.06);
     fallHoldActive = false;
     fallHoldTuned[fallHoldIdx] = true;
     var ch = fallActiveSide();
@@ -844,12 +902,15 @@
   function syncMusicToClarity(c, seen) {
     if (!scWidget || !scReady) return;
     if (!score.classList.contains("playing")) return;
+    var vol;
     if (state.active === "fall" && audioUnlocked && !seen) {
-      setScoreVolume(Math.max(72, Math.round(Math.max(0.72, c) * 100)));
-      return;
+      vol = Math.max(72, Math.round(Math.max(0.72, c) * 100));
+    } else {
+      var floor = (state.active === "fall" && audioUnlocked) ? 0.55 : 0.45;
+      vol = Math.round((seen ? 1 : Math.max(floor, c)) * 100);
     }
-    var floor = (state.active === "fall" && audioUnlocked) ? 0.55 : 0.45;
-    var vol = Math.round((seen ? 1 : Math.max(floor, c)) * 100);
+    if (vol === lastSyncScoreVol) return;
+    lastSyncScoreVol = vol;
     setScoreVolume(vol);
   }
 
@@ -1516,6 +1577,7 @@
   function onScorePlay() {
     score.classList.add("playing");
     scoreAutoplayPending = false;
+    lastSyncScoreVol = -1;
     if (charSelect && !charSelect.classList.contains("gone")) {
       setScoreVolume(100);
       return;
