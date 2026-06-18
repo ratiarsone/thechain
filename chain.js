@@ -790,6 +790,7 @@
       tuneGate.classList.remove("is-off");
       tuneGate.setAttribute("aria-hidden", "false");
     }
+    preloadFallScore();
   }
 
   function disarmFallGate() {
@@ -1536,6 +1537,26 @@
     loadScoreCue(scoreCueFor(id), false);
   }
 
+  // Preload the fall score (paused) so the widget is READY before TUNE IN is
+  // pressed. That lets the click trigger a true synchronous gesture-play, which
+  // low-MEI / incognito Chrome and Safari both require to start audio. We also
+  // actively defeat any stray autoplay (SoundCloud's load(auto_play:false) does
+  // not reliably stop playback) so the score truly waits behind the gate.
+  function preloadFallScore() {
+    try {
+      previewScoreForMemory("fall");
+      var killStrayAutoplay = function () {
+        if (audioUnlocked) return; // user tuned in — leave the score playing
+        if (scWidget) { try { scWidget.pause(); } catch (e) {} }
+        if (score) score.classList.remove("playing");
+      };
+      killStrayAutoplay();
+      setTimeout(killStrayAutoplay, 300);
+      setTimeout(killStrayAutoplay, 900);
+      setTimeout(killStrayAutoplay, 1700);
+    } catch (e) {}
+  }
+
   function ensureScorePlaying(vol) {
     if (!scWidget || !scReady || scLoadPending) {
       scoreAutoplayPending = true;
@@ -2209,10 +2230,12 @@
     }
     startClock();
     unlockScoreGesture();
-    // Start the score synchronously inside this click. Safari only permits
-    // audio that begins within the user-gesture call stack — a setTimeout here
-    // moves it outside the gesture and Safari silently blocks playback.
-    try { hardStartScore(scoreCueFor("fall")); } catch (e) { playScoreOnGesture(scoreCueFor("fall")); }
+    // Start the score synchronously inside this click. Browsers (esp. Safari and
+    // low-MEI / incognito Chrome) only permit audio that begins within the
+    // user-gesture call stack. Because the score is preloaded when the gate
+    // appears, the widget is already READY, so playScoreOnGesture issues a true
+    // synchronous play(); hardStartScore is the reload fallback if it wasn't.
+    try { playScoreOnGesture(scoreCueFor("fall")); } catch (e) { hardStartScore(scoreCueFor("fall")); }
     ensureSynthHum();
     if (synthHumCtx && synthHumCtx.state === "suspended") synthHumCtx.resume();
     setHumTarget(0.06);
@@ -2237,6 +2260,7 @@
         tuneGate.classList.remove("is-off");
         tuneGate.setAttribute("aria-hidden", "false");
       }
+      preloadFallScore();
       select(id, true);
     } else {
       startClock();
@@ -2359,7 +2383,17 @@
     // park ring on active without glitch
     csPick = (state.active && !charLocked(state.active)) ? state.active : RECEIVED[0];
     buildRoster();
-    highlightChar(csPick);
+    if (state.opened && state.active === "fall" && !charLocked(state.active)) {
+      // Entering the fall memory: park the ring but do NOT autoplay. The score
+      // must wait behind the TUNE IN gate and start on that click, so we only
+      // preload it paused here (highlightChar would have played it immediately).
+      csPick = "fall";
+      csHover = null;
+      paintFeatured("fall");
+      preloadFallScore();
+    } else {
+      highlightChar(csPick);
+    }
 
     if (state.opened && state.active && !charLocked(state.active)) {
       charSelect.classList.add("gone");
