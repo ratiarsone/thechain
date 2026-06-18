@@ -231,6 +231,7 @@
   var fallHoldTimer = null;
   var fallLineAudio = null;
   var lastSyncScoreVol = -1;
+  var USE_FALL_MP3 = false; // enable once /audio/mvt1/*.mp3 files exist
 
   var RING_R = 356;
   var nodeEls = {};
@@ -549,6 +550,7 @@
     hideTestimonyPrompt();
     clearFallHoldTimer();
     stopFallLineAudio();
+    cancelFallSpeech();
     showCaption("");
     stopPossessionAudio();
     if (possession) { possession.stop(); possession = null; }
@@ -597,32 +599,30 @@
       fallLineAudio.removeAttribute("src");
       fallLineAudio = null;
     }
-    if (window.ChainSpeech) window.ChainSpeech.cancel();
   }
 
-  function isFallLineSpeaking() {
-    if (fallLineAudio && !fallLineAudio.paused && !fallLineAudio.ended) return true;
-    if (window.ChainSpeech && window.ChainSpeech.speaking()) return true;
-    return false;
+  function cancelFallSpeech() {
+    if (window.ChainSpeech) window.ChainSpeech.cancel();
   }
 
   function fallLineWaitMs(text) {
     var words = (text || "").split(/\s+/).filter(Boolean).length;
-    return Math.max(4000, Math.min(12000, words * 450 + 900));
+    return Math.max(3000, Math.min(8000, words * 380 + 700));
   }
 
   function fallActiveSide() {
     return state.channel === "inner" ? "inner" : "outer";
   }
 
-  // Reveal one testimony line: caption + counter + voice (MP3 if present, else TTS).
-  // Advance after speech finishes; timer is only a fallback.
+  // Reveal one testimony line: caption + counter + TTS (MP3 optional).
+  // Timer drives advance so hold never deadlocks if speech events fail.
   function playFallLine(i) {
     var ch = fallActiveSide();
     var inh = fallInhabitant(ch);
     var line = inh.lines[i];
     if (!line) return;
     stopFallLineAudio();
+    cancelFallSpeech();
     fallHoldIdx = i;
     fallHoldActive = true;
     hideTestimonyPrompt();
@@ -632,48 +632,40 @@
     if (inhabitantView) inhabitantView.setClarity(1);
     setHumTarget(0.01);
 
-    var url = inh.voices && inh.voices[i];
     var waitMs = fallLineWaitMs(line);
-
-    function armTimer(ms) {
-      clearFallHoldTimer();
-      fallHoldTimer = setTimeout(onFallLineDone, ms);
-    }
-
-    function voiceEnded() {
-      if (!fallHoldActive || fallHoldIdx !== i) return;
-      clearFallHoldTimer();
-      fallHoldTimer = setTimeout(onFallLineDone, isDevelopActive() ? 220 : 0);
-    }
+    var url = USE_FALL_MP3 && inh.voices && inh.voices[i];
 
     function startTTS() {
       primeSpeech();
       if (window.ChainSpeech) {
-        window.ChainSpeech.speak(line, { side: ch, immediate: true, replace: true }, voiceEnded);
+        window.ChainSpeech.speak(line, { side: ch, immediate: true, replace: true });
       }
-      armTimer(waitMs);
     }
 
     if (url) {
       fallLineAudio = new Audio(url);
       fallLineAudio.preload = "auto";
-      fallLineAudio.addEventListener("ended", voiceEnded);
-      fallLineAudio.addEventListener("error", startTTS);
-      fallLineAudio.play().then(function () {
-        armTimer(Math.max(waitMs, 10000));
-      }).catch(startTTS);
+      fallLineAudio.addEventListener("ended", function () { fallLineAudio = null; });
+      fallLineAudio.addEventListener("error", function () {
+        fallLineAudio = null;
+        startTTS();
+      });
+      fallLineAudio.play().then(function () {}).catch(function () {
+        fallLineAudio = null;
+        startTTS();
+      });
     } else {
       startTTS();
     }
+
+    clearFallHoldTimer();
+    fallHoldTimer = setTimeout(onFallLineDone, waitMs);
   }
 
   function onFallLineDone() {
-    if (isFallLineSpeaking()) {
-      fallHoldTimer = setTimeout(onFallLineDone, 200);
-      return;
-    }
     clearFallHoldTimer();
     stopFallLineAudio();
+    cancelFallSpeech();
     setHumTarget(0.06);
     fallHoldActive = false;
     fallHoldTuned[fallHoldIdx] = true;
