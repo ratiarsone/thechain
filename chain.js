@@ -757,10 +757,38 @@
     return !getMemState(id).seen;
   }
 
+  // Whether a press should be accepted at all. For fall this also allows the
+  // pre-tune-in press (so startDevelop's safety net can tune in), not just the
+  // already-unlocked develop case.
+  function canPress(id) {
+    if (id === "fall" && isPossessionMode()) return !fallBothSidesSeen();
+    return canDevelop(id);
+  }
+
   function showTestimonyPrompt(text) {
     if (!testimonyPrompt) return;
     testimonyPrompt.textContent = text || "PRESS · HOLD TO REVEAL";
     testimonyPrompt.hidden = false;
+  }
+
+  function armFallGate() {
+    pendingFallEntry = true;
+    audioUnlocked = false;
+    stopIdle();
+    if (tuneGate) {
+      tuneGate.hidden = false;
+      tuneGate.classList.remove("is-off");
+      tuneGate.setAttribute("aria-hidden", "false");
+    }
+  }
+
+  function disarmFallGate() {
+    pendingFallEntry = false;
+    if (tuneGate) {
+      tuneGate.hidden = true;
+      tuneGate.classList.add("is-off");
+      tuneGate.setAttribute("aria-hidden", "true");
+    }
   }
 
   function hideTestimonyPrompt() {
@@ -1078,6 +1106,13 @@
 
   function startDevelop(e) {
     if (!inMemoryView()) return;
+    // Safety net: on the fall memory but possession never unlocked (e.g. the
+    // gate was missed or a stale state hid it) — tune in now, inside this user
+    // gesture, so a press always recovers the testimony instead of doing nothing.
+    if (state.active === "fall" && !audioUnlocked && !fallBothSidesSeen()) {
+      onTuneIn();
+      return;
+    }
     if (!canDevelop(state.active)) return;
     developing = true;
     if (e && typeof e.pointerId === "number") {
@@ -1114,7 +1149,7 @@
 
   function onStagePointerDown(e) {
     if (!inMemoryView()) return;
-    if (!canDevelop(state.active)) return;
+    if (!canPress(state.active)) return;
     if (e.target.closest(".node .badge, .readout, button, .recognition-flash, .lower, .chain-strip")) return;
     startDevelop(e);
   }
@@ -1122,7 +1157,7 @@
   stage.addEventListener("pointerdown", onStagePointerDown);
   if (developZone) {
     developZone.addEventListener("pointerdown", function (e) {
-      if (!inMemoryView() || !canDevelop(state.active)) return;
+      if (!inMemoryView() || !canPress(state.active)) return;
       e.preventDefault();
       startDevelop(e);
     });
@@ -1187,7 +1222,22 @@
   function select(id, withGlitch) {
     var f = byId[id];
     if (!f) return;
+    var wasFall = state.active === "fall" && id !== "fall";
     state.active = id;
+    if (state.opened) {
+      if (id === "fall") {
+        // Reaching the fall memory through any in-app nav (node, jog, strip)
+        // must arm the TUNE IN gate so possession can initialize.
+        if (!audioUnlocked) armFallGate();
+      } else if (wasFall) {
+        audioUnlocked = false;
+        stopPossession();
+        resetFallHoldState();
+        disarmFallGate();
+        startClock();
+        if (!reduceMotion) startIdle();
+      }
+    }
     rotateToFront(id);
     if (withGlitch && !reduceMotion) {
       crt.classList.remove("glitching"); stage.classList.remove("glitching");
