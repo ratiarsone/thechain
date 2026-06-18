@@ -225,7 +225,7 @@
   var pendingFallEntry = false;
   var currentCaption = "";
   var FALL_LINE_MS = 2600;
-  var SCORE_VOL_SCALE = 0.7; // song sits ~30% under the spoken testimony lines
+  var SCORE_VOL_SCALE = 0.35; // song at ~35% so testimony lines sit clearly above it
   var fallHoldIdx = 0;
   var fallHoldActive = false;
   var fallHoldTuned = [false, false, false, false];
