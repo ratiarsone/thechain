@@ -1597,10 +1597,11 @@
 
   function loadScoreCue(i, autoplay) {
     var t = SCORE_CUE[i];
-    if (!t) return;
+    if (!t || !scoreIframe) return;
     var shouldPlay = !!autoplay;
     cueIdx = i;
     updateScoreLabel();
+    // Already loaded with this cue and ready → just play (or leave paused).
     if (scWidget && scReady && !scLoadPending && loadedCueIdx === i) {
       if (shouldPlay) {
         scoreAutoplayPending = true;
@@ -1609,24 +1610,23 @@
       }
       return;
     }
-    if (!scWidget) {
-      pendingCue = i;
-      pendingAutoplay = shouldPlay;
-      scoreAutoplayPending = shouldPlay;
-      if (scoreIframe) scoreIframe.src = scoreEmbedSrc(t, shouldPlay);
-      if (shouldPlay) retryScorePlay();
-      return;
-    }
     if (scLoadPending) {
       pendingCue = i;
       pendingAutoplay = shouldPlay;
       scoreAutoplayPending = shouldPlay;
       return;
     }
+    // (Re)load by setting the iframe src to the API-format embed (tracks/<id> +
+    // secret_token). These are PRIVATE tracks — scWidget.load(pageUrl) 404s for
+    // them (the page URL needs the secret token), so we must use this format.
     scoreAutoplayPending = shouldPlay;
+    loadedCueIdx = -1;
     scReady = false;
     scLoadPending = true;
-    scWidget.load(t.page, { auto_play: shouldPlay });
+    scoreIframe.src = scoreEmbedSrc(t, shouldPlay);
+    scoreWidgetBound = false;
+    scWidget = null;
+    bindScoreWidget();
     if (shouldPlay) retryScorePlay();
   }
 
